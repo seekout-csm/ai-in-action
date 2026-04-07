@@ -4,7 +4,7 @@
 *.csv
 *.backup
 *_BACKUP_*
-index.html
+# index.html is now a redirect page — tracked intentionally
 weekly_progress_dashboard*.html
 *.log
 .DS_Store
