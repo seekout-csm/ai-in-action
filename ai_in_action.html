@@ -2750,6 +2750,30 @@ function renderPTTracker(fd){
 
 
 // ── Main render ───────────────────────────────────────────────────────────────
+// ── Spotlight sub-tab switcher ────────────────────────────────────────────────
+function switchSpotlightTab(panelId, btn){
+  // Hide all panels
+  document.querySelectorAll('.sp-tab-panel').forEach(p => p.style.display = 'none');
+  // Show selected
+  const panel = document.getElementById(panelId);
+  if(panel) panel.style.display = 'block';
+  // Reset all tab buttons
+  document.querySelectorAll('.sp-tab-btn').forEach(b => {
+    b.style.border = '1px solid var(--border)';
+    b.style.background = 'var(--card)';
+    b.style.color = 'var(--muted)';
+    b.querySelectorAll('span')[2].style.background = 'var(--border)';
+    b.querySelectorAll('span')[2].style.color = 'var(--muted)';
+  });
+  // Activate clicked button
+  const color = btn.dataset.color;
+  btn.style.border = '1px solid ' + color;
+  btn.style.background = color + '18';
+  btn.style.color = color;
+  btn.querySelectorAll('span')[2].style.background = color + '33';
+  btn.querySelectorAll('span')[2].style.color = color;
+}
+
 // ── Customer Spotlight ────────────────────────────────────────────────────────
 function renderSpotlight(fd){
   const el = document.getElementById('spotlight-content');
@@ -2834,96 +2858,123 @@ function renderSpotlight(fd){
     </table></div>`;
   };
 
+  // Calculate total licenses per category
+  const champLic   = champions.reduce((s,d)=>s+d.total_lic,0);
+  const growLic    = growing.reduce((s,d)=>s+d.total_lic,0);
+  const buildLic   = building.reduce((s,d)=>s+d.total_lic,0);
+  const lowLic     = low.reduce((s,d)=>s+d.total_lic,0);
+  const notStartLic= notStarted.reduce((s,d)=>s+d.total_lic,0);
+
   el.innerHTML = `
     <!-- Hero KPI row -->
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:4px">
       ${[
-        {icon:'🏆', label:'Champions',   val:champions.length,  sub:'≥ 80% WS adoption',  color:'var(--green)'},
-        {icon:'📈', label:'Growing',     val:growing.length,    sub:'50–79% WS adoption',  color:'var(--accent)'},
-        {icon:'🔄', label:'Building',    val:building.length,   sub:'20–49% WS adoption',  color:'var(--purple)'},
-        {icon:'⚠️', label:'Low Adoption',val:low.length,        sub:'1–19% WS adoption',   color:'#FFA000'},
-        {icon:'❌', label:'Not Started', val:notStarted.length, sub:'0% WS adoption',      color:'var(--red)'},
+        {icon:'🏆', label:'Champions',   val:champions.length,  lic:champLic,    sub:'≥ 80% WS adoption',  color:'var(--green)'},
+        {icon:'📈', label:'Growing',     val:growing.length,    lic:growLic,     sub:'50–79% WS adoption',  color:'var(--accent)'},
+        {icon:'🔄', label:'Building',    val:building.length,   lic:buildLic,    sub:'20–49% WS adoption',  color:'var(--purple)'},
+        {icon:'⚠️', label:'Low Adoption',val:low.length,        lic:lowLic,      sub:'1–19% WS adoption',   color:'#FFA000'},
+        {icon:'❌', label:'Not Started', val:notStarted.length, lic:notStartLic, sub:'0% WS adoption',      color:'var(--red)'},
       ].map(k=>`
         <div style="background:var(--card);border-radius:10px;padding:14px 16px;border-top:3px solid ${k.color}">
           <div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${k.icon} ${k.label}</div>
           <div style="font-size:1.7rem;font-weight:800;color:${k.color}">${k.val}</div>
           <div style="font-size:.68rem;color:var(--muted);margin-top:2px">${k.sub}</div>
+          <div style="font-size:.72rem;color:var(--fg);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);display:flex;align-items:center;gap:4px">
+            <span style="color:var(--muted)">Licenses:</span>
+            <span style="font-weight:700;color:${k.color}">${Math.round(k.lic).toLocaleString()}</span>
+          </div>
         </div>`).join('')}
     </div>
 
-    <!-- Overall adoption bar -->
-    <div style="background:var(--card);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:20px">
-      <div style="font-size:.75rem;color:var(--muted);white-space:nowrap">Overall WS Adoption</div>
-      <div style="flex:1;height:10px;background:var(--border);border-radius:6px;overflow:hidden">
-        ${[
-          {pct:champions.length/fd.length, color:'#00D68F'},
-          {pct:growing.length/fd.length,   color:'#00C2CB'},
-          {pct:building.length/fd.length,  color:'#7B5EA7'},
-          {pct:low.length/fd.length,       color:'#FFA000'},
-          {pct:notStarted.length/fd.length,color:'#FF4D4F'},
-        ].map(s=>`<div style="width:${(s.pct*100).toFixed(1)}%;height:100%;background:${s.color};display:inline-block"></div>`).join('')}
-      </div>
-      <div style="font-size:.75rem;color:var(--muted);white-space:nowrap">${Math.round(totalWS)} of ${Math.round(totalLic)} WS users (${(avgAdopt*100).toFixed(1)}% avg)</div>
+
+    <!-- Sub-tab navigation for tables -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px" id="spotlight-subtabs">
+      ${[
+        {id:'sp-champions', icon:'🏆', label:'Champions',    count:champions.length, color:'#00D68F'},
+        {id:'sp-growing',   icon:'📈', label:'Growing',      count:growing.length,   color:'#00C2CB'},
+        {id:'sp-building',  icon:'🔄', label:'Building',     count:building.length,  color:'#7B5EA7'},
+        {id:'sp-low',       icon:'⚠️', label:'Low Adoption', count:low.length,       color:'#FFA000'},
+        {id:'sp-notstarted',icon:'❌', label:'Not Started',  count:notStarted.length,color:'#FF4D4F'},
+      ].map((t,i)=>`
+        <button onclick="switchSpotlightTab('${t.id}',this)" class="sp-tab-btn" style="
+          padding:8px 16px;border-radius:8px;border:1px solid ${i===0?t.color:'var(--border)'};
+          background:${i===0?t.color+'18':'var(--card)'};color:${i===0?t.color:'var(--muted)'};
+          font-size:.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;
+          transition:all .2s" data-color="${t.color}">
+          <span>${t.icon}</span>
+          <span>${t.label}</span>
+          <span style="background:${i===0?t.color+'33':'var(--border)'};padding:1px 8px;border-radius:10px;font-size:.7rem;font-weight:700;color:${i===0?t.color:'var(--muted)'}">${t.count}</span>
+        </button>`).join('')}
     </div>
 
     <!-- Champions section -->
-    <div style="background:var(--card);border-radius:10px;overflow:hidden">
-      <div style="padding:14px 18px;background:#00D68F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-        <span style="font-size:1.1rem">🏆</span>
-        <div>
-          <div style="font-weight:700;color:var(--green)">Champions — Success Story Candidates</div>
-          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${champions.length} accounts at ≥ 80% WS adoption · These customers are your best references and case study candidates</div>
+    <div id="sp-champions" class="sp-tab-panel" style="display:block">
+      <div style="background:var(--card);border-radius:10px;overflow:hidden">
+        <div style="padding:14px 18px;background:#00D68F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.1rem">🏆</span>
+          <div>
+            <div style="font-weight:700;color:var(--green)">Champions — Success Story Candidates</div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${champions.length} accounts at ≥ 80% WS adoption · These customers are your best references and case study candidates</div>
+          </div>
         </div>
+        ${tableRows(champions)}
       </div>
-      ${tableRows(champions)}
     </div>
 
     <!-- Growing section -->
-    <div style="background:var(--card);border-radius:10px;overflow:hidden">
-      <div style="padding:14px 18px;background:#00C2CB12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-        <span style="font-size:1.1rem">📈</span>
-        <div>
-          <div style="font-weight:700;color:var(--accent)">Growing — Almost There</div>
-          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${growing.length} accounts at 50–79% WS adoption · Close to champion status — a quick CSM check-in could push them over</div>
+    <div id="sp-growing" class="sp-tab-panel" style="display:none">
+      <div style="background:var(--card);border-radius:10px;overflow:hidden">
+        <div style="padding:14px 18px;background:#00C2CB12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.1rem">📈</span>
+          <div>
+            <div style="font-weight:700;color:var(--accent)">Growing — Almost There</div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${growing.length} accounts at 50–79% WS adoption · Close to champion status — a quick CSM check-in could push them over</div>
+          </div>
         </div>
+        ${tableRows(growing)}
       </div>
-      ${tableRows(growing)}
     </div>
 
     <!-- Building section -->
-    <div style="background:var(--card);border-radius:10px;overflow:hidden">
-      <div style="padding:14px 18px;background:#7B5EA712;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-        <span style="font-size:1.1rem">🔄</span>
-        <div>
-          <div style="font-weight:700;color:var(--purple)">Building Momentum — Nurture These</div>
-          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${building.length} accounts at 20–49% WS adoption · Training underway — focus on post-training follow-up cadence</div>
+    <div id="sp-building" class="sp-tab-panel" style="display:none">
+      <div style="background:var(--card);border-radius:10px;overflow:hidden">
+        <div style="padding:14px 18px;background:#7B5EA712;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.1rem">🔄</span>
+          <div>
+            <div style="font-weight:700;color:var(--purple)">Building Momentum — Nurture These</div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${building.length} accounts at 20–49% WS adoption · Training underway — focus on post-training follow-up cadence</div>
+          </div>
         </div>
+        ${tableRows(building)}
       </div>
-      ${tableRows(building)}
     </div>
 
     <!-- Low Adoption section -->
-    <div style="background:var(--card);border-radius:10px;overflow:hidden">
-      <div style="padding:14px 18px;background:#FFA00012;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-        <span style="font-size:1.1rem">⚠️</span>
-        <div>
-          <div style="font-weight:700;color:#FFA000">Low Adoption — Needs Attention</div>
-          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${low.length} accounts at 1–19% WS adoption · Started but stalled — prioritize re-engagement and check training status</div>
+    <div id="sp-low" class="sp-tab-panel" style="display:none">
+      <div style="background:var(--card);border-radius:10px;overflow:hidden">
+        <div style="padding:14px 18px;background:#FFA00012;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.1rem">⚠️</span>
+          <div>
+            <div style="font-weight:700;color:#FFA000">Low Adoption — Needs Attention</div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${low.length} accounts at 1–19% WS adoption · Started but stalled — prioritize re-engagement and check training status</div>
+          </div>
         </div>
+        ${tableRows(low)}
       </div>
-      ${tableRows(low)}
     </div>
 
     <!-- Not Started section -->
-    <div style="background:var(--card);border-radius:10px;overflow:hidden">
-      <div style="padding:14px 18px;background:#FF4D4F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-        <span style="font-size:1.1rem">❌</span>
-        <div>
-          <div style="font-weight:700;color:var(--red)">Not Using Workspaces — Immediate Opportunity</div>
-          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${notStarted.length} accounts at 0% WS adoption · Sorted by license count — largest accounts represent highest recovery value</div>
+    <div id="sp-notstarted" class="sp-tab-panel" style="display:none">
+      <div style="background:var(--card);border-radius:10px;overflow:hidden">
+        <div style="padding:14px 18px;background:#FF4D4F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.1rem">❌</span>
+          <div>
+            <div style="font-weight:700;color:var(--red)">Not Using Workspaces — Immediate Opportunity</div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${notStarted.length} accounts at 0% WS adoption · Sorted by license count — largest accounts represent highest recovery value</div>
+          </div>
         </div>
+        ${tableRows(notStarted)}
       </div>
-      ${tableRows(notStarted)}
     </div>
   `;
 }
