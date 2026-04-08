@@ -1980,17 +1980,26 @@ function renderInsights(fd, kpi){
     if(!d.wp_cat)     s.notTouched++;
   });
 
-  // Score = 60% Workspaces adoption rate + 40% actioning rate (only CSMs with ≥2 accounts)
+  // Score: PRIMARY = Above/Below Target (from official Metrics); SECONDARY = live adoption+actioning rate
   const scored=Object.entries(csmPerf)
     .filter(([,s])=>s.total>=2)
     .map(([csm,s])=>{
       const adoptR  = s.totalLic>0 ? s.wsLic/s.totalLic : 0;
       const actionR = s.total>0 ? s.actioned/s.total : 0;
       const postR   = s.total>0 ? s.post/s.total : 0;
-      const score   = adoptR*0.6 + actionR*0.4;
-      return {csm,...s,adoptR,actionR,postR,score};
+      // Primary: above/below official target (1=Above, 0=Below/unknown)
+      const csmMeta = CSM_ADOPTION[csm];
+      const aboveTarget = csmMeta?.above_below === 'Up' ? 1 : 0;
+      // Secondary: 60% adoption + 40% actioning (lower weight than target status)
+      const perfScore = adoptR*0.6 + actionR*0.4;
+      return {csm,...s,adoptR,actionR,postR,aboveTarget,perfScore};
     })
-    .sort((a,b)=>b.score-a.score);
+    .sort((a,b)=>{
+      // 1st priority: above target ranks higher than below target
+      if(a.aboveTarget !== b.aboveTarget) return b.aboveTarget - a.aboveTarget;
+      // 2nd priority (tiebreaker): combined performance score
+      return b.perfScore - a.perfScore;
+    });
 
   const topCSM  = scored[0]||null;
   const topCSM2 = scored[1]||null;
@@ -2042,10 +2051,10 @@ function renderInsights(fd, kpi){
       <div class="insight-icon">🏆</div>
       <div class="insight-text">
         <span class="insight-label">Customer Success Manager Performance — Leading: </span>
-        <span class="hg">${topCSM.csm}</span> — Workspaces adoption <strong>${(topCSM.adoptR*100).toFixed(1)}%</strong>,
+        <span class="hg">${topCSM.csm}</span>${topCSM.aboveTarget?' <span style="background:#00D68F22;color:#00D68F;font-size:.72rem;padding:1px 6px;border-radius:4px;font-weight:700">▲ Above Target</span>':''} — Workspaces adoption <strong>${(topCSM.adoptR*100).toFixed(1)}%</strong>,
         actioned <strong>${Math.round(topCSM.actionR*100)}%</strong> of ${topCSM.total} accounts
         (${topCSM.post} post-training, ${topCSM.notTouched} untouched).
-        ${topCSM2?`<br><span class="hg">${topCSM2.csm}</span> — Workspaces adoption <strong>${(topCSM2.adoptR*100).toFixed(1)}%</strong>, actioned <strong>${Math.round(topCSM2.actionR*100)}%</strong> of ${topCSM2.total} accounts.`:''}
+        ${topCSM2?`<br><span class="hg">${topCSM2.csm}</span>${topCSM2.aboveTarget?' <span style="background:#00D68F22;color:#00D68F;font-size:.72rem;padding:1px 6px;border-radius:4px;font-weight:700">▲ Above Target</span>':''} — Workspaces adoption <strong>${(topCSM2.adoptR*100).toFixed(1)}%</strong>, actioned <strong>${Math.round(topCSM2.actionR*100)}%</strong> of ${topCSM2.total} accounts.`:''}
       </div>
     </div>`:'';
 
@@ -2054,11 +2063,11 @@ function renderInsights(fd, kpi){
       <div class="insight-icon">📉</div>
       <div class="insight-text">
         <span class="insight-label">Customer Success Manager Performance — Needs Attention: </span>
-        <span class="ho">${botCSM.csm}</span> — Workspaces adoption <strong>${(botCSM.adoptR*100).toFixed(1)}%</strong>,
+        <span class="ho">${botCSM.csm}</span>${!botCSM.aboveTarget?' <span style="background:#FF4D4F22;color:#FF4D4F;font-size:.72rem;padding:1px 6px;border-radius:4px;font-weight:700">▼ Below Target</span>':''} — Workspaces adoption <strong>${(botCSM.adoptR*100).toFixed(1)}%</strong>,
         only actioned <strong>${Math.round(botCSM.actionR*100)}%</strong> of ${botCSM.total} accounts
         (${botCSM.notTouched} untouched, ${botCSM.noMtg} no meeting).
         Recommend: prioritize outreach to untouched accounts &amp; schedule missing meetings.
-        ${botCSM2&&botCSM2.csm!==topCSM?.csm?`<br><span class="ho">${botCSM2.csm}</span> — Workspaces adoption <strong>${(botCSM2.adoptR*100).toFixed(1)}%</strong>, actioning <strong>${Math.round(botCSM2.actionR*100)}%</strong>. Focus on ${botCSM2.notTouched} untouched accounts.`:''}
+        ${botCSM2&&botCSM2.csm!==topCSM?.csm?`<br><span class="ho">${botCSM2.csm}</span>${!botCSM2.aboveTarget?' <span style="background:#FF4D4F22;color:#FF4D4F;font-size:.72rem;padding:1px 6px;border-radius:4px;font-weight:700">▼ Below Target</span>':''} — Workspaces adoption <strong>${(botCSM2.adoptR*100).toFixed(1)}%</strong>, actioning <strong>${Math.round(botCSM2.actionR*100)}%</strong>. Focus on ${botCSM2.notTouched} untouched accounts.`:''}
       </div>
     </div>`:'';
 
