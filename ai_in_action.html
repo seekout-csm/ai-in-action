@@ -1755,6 +1755,12 @@ function msInit(id,placeholder){
 }
 // Click outside any open dropdown: close it and apply selection
 document.addEventListener('click', e=>{
+  // Handle spotlight subtab clicks BEFORE render() rebuilds the DOM
+  const spBtn = e.target.closest('.sp-tab-btn');
+  if(spBtn){
+    const panelId = spBtn.dataset.panel;
+    if(panelId) _activeSpotlightTab = panelId;
+  }
   document.querySelectorAll('.ms-dropdown.open').forEach(dd=>{
     dd.classList.remove('open');
     dd.closest('.ms-wrap').querySelector('.ms-trigger').classList.remove('open');
@@ -2899,7 +2905,7 @@ function renderSpotlight(fd){
         {id:'sp-low',       icon:'⚠️', label:'Low Adoption', count:low.length,       color:'#FFA000'},
         {id:'sp-notstarted',icon:'❌', label:'Not Started',  count:notStarted.length,color:'#FF4D4F'},
       ].map((t)=>{const isAct = (_activeSpotlightTab===t.id); return `
-        <button onclick="switchSpotlightTab('${t.id}',this)" class="sp-tab-btn" style="
+        <button class="sp-tab-btn" data-panel="${t.id}" style="
           padding:8px 16px;border-radius:8px;border:1px solid ${isAct?t.color:'var(--border)'};
           background:${isAct?t.color+'18':'var(--card)'};color:${isAct?t.color:'var(--muted)'};
           font-size:.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;
