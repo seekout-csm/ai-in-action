@@ -228,6 +228,7 @@
   #sub-insights{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding-bottom:8px;}
   #sub-csm{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:12px;flex-direction:column;gap:22px;}
   #sub-pt{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:0;}
+  #sub-spotlight{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:16px;flex-direction:column;gap:16px;}
   /* Pipeline nested tab bar */
   .pl-tab-bar{display:flex;gap:0;padding:6px 0 0 0;border-bottom:2px solid var(--border);margin-bottom:6px;flex-shrink:0;}
   .pl-btn{border:none;background:transparent;color:var(--muted);border-radius:8px 8px 0 0;
@@ -369,15 +370,14 @@
       <div id="pl-activepipe-content"></div>
     </div>
   </div>
-</main>
-
-
-<footer>SeekOut &copy; Copyright <span id="footer-year"></span></footer>
 
   <!-- TAB 4: Customer Spotlight -->
-  <div id="sub-spotlight" style="display:none;flex-direction:column;gap:16px;padding-bottom:16px;min-height:0;overflow-y:auto">
+  <div id="sub-spotlight" style="display:none">
     <div id="spotlight-content"></div>
   </div>
+</main>
+
+<footer>SeekOut &copy; Copyright <span id="footer-year"></span></footer>
 
 <script>
 const RAW = [
@@ -2791,10 +2791,23 @@ function renderSpotlight(fd){
     return '<span style="background:#FF4D4F22;color:#FF4D4F;font-size:.68rem;padding:2px 7px;border-radius:10px;font-weight:700">❌ Not Started</span>';
   };
 
-  // Build a section table
-  const tableRows = (rows, limit) => {
-    const shown = limit ? rows.slice(0, limit) : rows;
-    if(!shown.length) return '<div style="padding:12px;color:var(--muted);font-size:.8rem;text-align:center">No accounts in this category</div>';
+  // Training status label + badge
+  const WP_LABEL = {
+    post_train: {icon:'✅', label:'Post-Training',   color:'#00D68F'},
+    in_prog:    {icon:'🔄', label:'In Progress',     color:'#00C2CB'},
+    meeting:    {icon:'📅', label:'Meeting Set',     color:'#7B5EA7'},
+    no_meeting: {icon:'🔴', label:'No Meeting Set',  color:'#FF4D4F'},
+    not_prior:  {icon:'⬛', label:'Not Prioritized', color:'#8A7A9B'},
+  };
+  const wpBadge = (cat) => {
+    const w = WP_LABEL[cat];
+    if(w) return `<span style="font-size:.68rem;padding:2px 7px;border-radius:10px;font-weight:600;background:${w.color}22;color:${w.color};white-space:nowrap">${w.icon} ${w.label}</span>`;
+    return '<span style="font-size:.68rem;color:var(--muted)">— Not Actioned</span>';
+  };
+
+  // Build a section table — always show ALL rows
+  const tableRows = (rows) => {
+    if(!rows.length) return '<div style="padding:12px;color:var(--muted);font-size:.8rem;text-align:center">No accounts in this category</div>';
     return `<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:.76rem">
       <thead><tr style="border-bottom:1px solid var(--border)">
         <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Account</th>
@@ -2803,9 +2816,10 @@ function renderSpotlight(fd){
         <th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600">Licenses</th>
         <th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600">WS Users</th>
         <th style="padding:8px 10px;min-width:160px;color:var(--muted);font-weight:600">WS Adoption</th>
-        <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Status</th>
+        <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Adoption Status</th>
+        <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Training Status</th>
       </tr></thead>
-      <tbody>${shown.map((d,i)=>`
+      <tbody>${rows.map((d,i)=>`
         <tr style="border-bottom:1px solid var(--border);${i%2===0?'':'background:#ffffff06'}">
           <td style="padding:8px 10px;font-weight:600;color:var(--fg)">${d.account}</td>
           <td style="padding:8px 10px;color:var(--muted)">${d.csm.split(' ')[0]}</td>
@@ -2814,9 +2828,10 @@ function renderSpotlight(fd){
           <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--accent)">${Math.round(d.ws_lic)}</td>
           <td style="padding:8px 10px">${bar(d.ws_adopt_pct, d.ws_adopt_pct>=0.8?'#00D68F':d.ws_adopt_pct>=0.5?'#00C2CB':d.ws_adopt_pct>=0.2?'#7B5EA7':'#FFA000')}</td>
           <td style="padding:8px 10px">${badge(d.ws_adopt_pct)}</td>
+          <td style="padding:8px 10px">${wpBadge(d.wp_cat)}</td>
         </tr>`).join('')}
       </tbody>
-    </table>${rows.length>limit?`<div style="padding:8px 12px;font-size:.74rem;color:var(--muted)">${rows.length-limit} more accounts not shown — use CSM or Tier filter to narrow down.</div>`:''}</div>`;
+    </table></div>`;
   };
 
   el.innerHTML = `
@@ -2860,7 +2875,7 @@ function renderSpotlight(fd){
           <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${champions.length} accounts at ≥ 80% WS adoption · These customers are your best references and case study candidates</div>
         </div>
       </div>
-      ${tableRows(champions, 20)}
+      ${tableRows(champions)}
     </div>
 
     <!-- Growing section -->
@@ -2872,7 +2887,7 @@ function renderSpotlight(fd){
           <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${growing.length} accounts at 50–79% WS adoption · Close to champion status — a quick CSM check-in could push them over</div>
         </div>
       </div>
-      ${tableRows(growing, 15)}
+      ${tableRows(growing)}
     </div>
 
     <!-- Building section -->
@@ -2884,7 +2899,19 @@ function renderSpotlight(fd){
           <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${building.length} accounts at 20–49% WS adoption · Training underway — focus on post-training follow-up cadence</div>
         </div>
       </div>
-      ${tableRows(building, 15)}
+      ${tableRows(building)}
+    </div>
+
+    <!-- Low Adoption section -->
+    <div style="background:var(--card);border-radius:10px;overflow:hidden">
+      <div style="padding:14px 18px;background:#FFA00012;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.1rem">⚠️</span>
+        <div>
+          <div style="font-weight:700;color:#FFA000">Low Adoption — Needs Attention</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${low.length} accounts at 1–19% WS adoption · Started but stalled — prioritize re-engagement and check training status</div>
+        </div>
+      </div>
+      ${tableRows(low)}
     </div>
 
     <!-- Not Started section -->
@@ -2896,7 +2923,7 @@ function renderSpotlight(fd){
           <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${notStarted.length} accounts at 0% WS adoption · Sorted by license count — largest accounts represent highest recovery value</div>
         </div>
       </div>
-      ${tableRows(notStarted, 25)}
+      ${tableRows(notStarted)}
     </div>
   `;
 }
