@@ -2751,7 +2751,10 @@ function renderPTTracker(fd){
 
 // ── Main render ───────────────────────────────────────────────────────────────
 // ── Spotlight sub-tab switcher ────────────────────────────────────────────────
+let _activeSpotlightTab = 'sp-champions';   // remember active tab across re-renders
+
 function switchSpotlightTab(panelId, btn){
+  _activeSpotlightTab = panelId;
   // Hide all panels
   document.querySelectorAll('.sp-tab-panel').forEach(p => p.style.display = 'none');
   // Show selected
@@ -2895,20 +2898,20 @@ function renderSpotlight(fd){
         {id:'sp-building',  icon:'🔄', label:'Building',     count:building.length,  color:'#7B5EA7'},
         {id:'sp-low',       icon:'⚠️', label:'Low Adoption', count:low.length,       color:'#FFA000'},
         {id:'sp-notstarted',icon:'❌', label:'Not Started',  count:notStarted.length,color:'#FF4D4F'},
-      ].map((t,i)=>`
+      ].map((t)=>{const isAct = (_activeSpotlightTab===t.id); return `
         <button onclick="switchSpotlightTab('${t.id}',this)" class="sp-tab-btn" style="
-          padding:8px 16px;border-radius:8px;border:1px solid ${i===0?t.color:'var(--border)'};
-          background:${i===0?t.color+'18':'var(--card)'};color:${i===0?t.color:'var(--muted)'};
+          padding:8px 16px;border-radius:8px;border:1px solid ${isAct?t.color:'var(--border)'};
+          background:${isAct?t.color+'18':'var(--card)'};color:${isAct?t.color:'var(--muted)'};
           font-size:.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;
           transition:all .2s" data-color="${t.color}">
           <span>${t.icon}</span>
           <span>${t.label}</span>
-          <span style="background:${i===0?t.color+'33':'var(--border)'};padding:1px 8px;border-radius:10px;font-size:.7rem;font-weight:700;color:${i===0?t.color:'var(--muted)'}">${t.count}</span>
-        </button>`).join('')}
+          <span style="background:${isAct?t.color+'33':'var(--border)'};padding:1px 8px;border-radius:10px;font-size:.7rem;font-weight:700;color:${isAct?t.color:'var(--muted)'}">${t.count}</span>
+        </button>`;}).join('')}
     </div>
 
     <!-- Champions section -->
-    <div id="sp-champions" class="sp-tab-panel" style="display:block">
+    <div id="sp-champions" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-champions'?'block':'none'}">
       <div style="background:var(--card);border-radius:10px;overflow:hidden">
         <div style="padding:14px 18px;background:#00D68F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
           <span style="font-size:1.1rem">🏆</span>
@@ -2922,7 +2925,7 @@ function renderSpotlight(fd){
     </div>
 
     <!-- Growing section -->
-    <div id="sp-growing" class="sp-tab-panel" style="display:none">
+    <div id="sp-growing" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-growing'?'block':'none'}">
       <div style="background:var(--card);border-radius:10px;overflow:hidden">
         <div style="padding:14px 18px;background:#00C2CB12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
           <span style="font-size:1.1rem">📈</span>
@@ -2936,7 +2939,7 @@ function renderSpotlight(fd){
     </div>
 
     <!-- Building section -->
-    <div id="sp-building" class="sp-tab-panel" style="display:none">
+    <div id="sp-building" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-building'?'block':'none'}">
       <div style="background:var(--card);border-radius:10px;overflow:hidden">
         <div style="padding:14px 18px;background:#7B5EA712;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
           <span style="font-size:1.1rem">🔄</span>
@@ -2950,7 +2953,7 @@ function renderSpotlight(fd){
     </div>
 
     <!-- Low Adoption section -->
-    <div id="sp-low" class="sp-tab-panel" style="display:none">
+    <div id="sp-low" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-low'?'block':'none'}">
       <div style="background:var(--card);border-radius:10px;overflow:hidden">
         <div style="padding:14px 18px;background:#FFA00012;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
           <span style="font-size:1.1rem">⚠️</span>
@@ -2964,7 +2967,7 @@ function renderSpotlight(fd){
     </div>
 
     <!-- Not Started section -->
-    <div id="sp-notstarted" class="sp-tab-panel" style="display:none">
+    <div id="sp-notstarted" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-notstarted'?'block':'none'}">
       <div style="background:var(--card);border-radius:10px;overflow:hidden">
         <div style="padding:14px 18px;background:#FF4D4F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
           <span style="font-size:1.1rem">❌</span>
