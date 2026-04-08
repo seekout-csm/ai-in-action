@@ -1877,8 +1877,10 @@ function renderAdoptSummary(fd){
   const onTrack  = adoptPct >= targetPct;
   const adoptW   = Math.min(100,(adoptPct/Math.max(targetPct,0.01))*100).toFixed(0);
   const baseW    = Math.min(100,(baselinePct/Math.max(targetPct,0.01))*100).toFixed(0);
-  // lic needed: single-CSM no-tier → official Metrics value (matches CSM table); else → live
-  const _csmLicToTgt = isSingleCSM && !hasTierFilter ? CSM_ADOPTION[activeCsms[0]].lic_to_target : undefined;
+  // lic needed: no filter → METRICS_TOTAL (authoritative); single-CSM no-tier → CSM value; else → live
+  const _csmLicToTgt = !anyFilter
+    ? METRICS_TOTAL.lic_to_target
+    : (isSingleCSM && !hasTierFilter ? CSM_ADOPTION[activeCsms[0]].lic_to_target : undefined);
   const licNeeded = gap<=0 ? 0
     : (_csmLicToTgt != null ? _csmLicToTgt : (_csmLicToTgt===0 ? 0 : Math.round(gap*totalLic)));
 
@@ -1943,8 +1945,10 @@ function renderInsights(fd, kpi){
     return licSum>0 ? wtSum/licSum : METRICS_TOTAL.target;
   })();
   const gap      = target - adoptPct;
-  // lic needed: single-CSM no-tier → official Metrics value (matches CSM table & Insights card); else → live
-  const _insLicToTgt = isSingleCSMIns && !hasTierFilterIns ? CSM_ADOPTION[activeCsms[0]].lic_to_target : undefined;
+  // lic needed: no filter → METRICS_TOTAL (authoritative); single-CSM no-tier → CSM value; else → live
+  const _insLicToTgt = !anyFilterIns
+    ? METRICS_TOTAL.lic_to_target
+    : (isSingleCSMIns && !hasTierFilterIns ? CSM_ADOPTION[activeCsms[0]].lic_to_target : undefined);
   const licToTgt = gap<=0 ? 0
     : (_insLicToTgt != null ? _insLicToTgt : (_insLicToTgt===0 ? 0 : Math.round(gap*totalLic)));
 
