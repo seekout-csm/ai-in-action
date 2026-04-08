@@ -1755,8 +1755,8 @@ function msInit(id,placeholder){
 }
 // Click outside any open dropdown: close it and apply selection
 document.addEventListener('click', e=>{
-  // Handle spotlight subtab clicks BEFORE render() rebuilds the DOM
-  const spBtn = e.target.closest('.sp-tab-btn');
+  // Handle spotlight KPI-tab card clicks BEFORE render() rebuilds the DOM
+  const spBtn = e.target.closest('.sp-kpi-tab');
   if(spBtn){
     const panelId = spBtn.dataset.panel;
     if(panelId) _activeSpotlightTab = panelId;
@@ -2756,31 +2756,40 @@ function renderPTTracker(fd){
 
 
 // ── Main render ───────────────────────────────────────────────────────────────
-// ── Spotlight sub-tab switcher ────────────────────────────────────────────────
+// ── Spotlight KPI-card tab switcher ──────────────────────────────────────────
 let _activeSpotlightTab = 'sp-champions';   // remember active tab across re-renders
 
-function switchSpotlightTab(panelId, btn){
+function switchSpotlightTab(panelId){
   _activeSpotlightTab = panelId;
   // Hide all panels
   document.querySelectorAll('.sp-tab-panel').forEach(p => p.style.display = 'none');
-  // Show selected
+  // Show selected panel
   const panel = document.getElementById(panelId);
   if(panel) panel.style.display = 'block';
-  // Reset all tab buttons
-  document.querySelectorAll('.sp-tab-btn').forEach(b => {
-    b.style.border = '1px solid var(--border)';
-    b.style.background = 'var(--card)';
-    b.style.color = 'var(--muted)';
-    b.querySelectorAll('span')[2].style.background = 'var(--border)';
-    b.querySelectorAll('span')[2].style.color = 'var(--muted)';
+  // Reset all KPI cards to inactive state
+  document.querySelectorAll('.sp-kpi-tab').forEach(card => {
+    const c = card.dataset.color;
+    card.style.border = '1px solid var(--border)';
+    card.style.borderTop = '3px solid ' + c;
+    card.style.background = 'var(--card)';
+    card.style.transform = '';
+    card.style.boxShadow = '';
+    // reset count chip
+    const chip = card.querySelector('.sp-count-chip');
+    if(chip){ chip.style.background = 'var(--border)'; chip.style.color = 'var(--muted)'; }
   });
-  // Activate clicked button
-  const color = btn.dataset.color;
-  btn.style.border = '1px solid ' + color;
-  btn.style.background = color + '18';
-  btn.style.color = color;
-  btn.querySelectorAll('span')[2].style.background = color + '33';
-  btn.querySelectorAll('span')[2].style.color = color;
+  // Activate the selected card
+  const activeCard = document.querySelector('.sp-kpi-tab[data-panel="' + panelId + '"]');
+  if(activeCard){
+    const color = activeCard.dataset.color;
+    activeCard.style.border = '2px solid ' + color;
+    activeCard.style.borderTop = '3px solid ' + color;
+    activeCard.style.background = color + '14';
+    activeCard.style.transform = 'translateY(-2px)';
+    activeCard.style.boxShadow = '0 6px 20px ' + color + '30';
+    const chip = activeCard.querySelector('.sp-count-chip');
+    if(chip){ chip.style.background = color + '33'; chip.style.color = color; }
+  }
 }
 
 // ── Customer Spotlight ────────────────────────────────────────────────────────
@@ -2867,124 +2876,73 @@ function renderSpotlight(fd){
     </table></div>`;
   };
 
-  // Calculate total licenses per category
-  const champLic   = champions.reduce((s,d)=>s+d.total_lic,0);
-  const growLic    = growing.reduce((s,d)=>s+d.total_lic,0);
-  const buildLic   = building.reduce((s,d)=>s+d.total_lic,0);
-  const lowLic     = low.reduce((s,d)=>s+d.total_lic,0);
-  const notStartLic= notStarted.reduce((s,d)=>s+d.total_lic,0);
+  // Category definitions — single source of truth for cards + panels
+  const CATS = [
+    {id:'sp-champions', icon:'🏆', label:'Champions',    rows:champions, sub:'≥ 80% adoption',  color:'#00D68F',
+     desc:'Champions — Success Story Candidates',    descSub:'These customers are your best references and case study candidates',         bg:'#00D68F12'},
+    {id:'sp-growing',   icon:'📈', label:'Growing',      rows:growing,   sub:'50–79% adoption', color:'#00C2CB',
+     desc:'Growing — Almost There',                  descSub:'Close to champion status — a quick CSM check-in could push them over',       bg:'#00C2CB12'},
+    {id:'sp-building',  icon:'🔄', label:'Building',     rows:building,  sub:'20–49% adoption', color:'#7B5EA7',
+     desc:'Building Momentum — Nurture These',       descSub:'Training underway — focus on post-training follow-up cadence',               bg:'#7B5EA712'},
+    {id:'sp-low',       icon:'⚠️', label:'Low Adoption', rows:low,       sub:'1–19% adoption',  color:'#FFA000',
+     desc:'Low Adoption — Needs Attention',          descSub:'Started but stalled — prioritize re-engagement and check training status',   bg:'#FFA00012'},
+    {id:'sp-notstarted',icon:'❌', label:'Not Started',  rows:notStarted,sub:'0% adoption',     color:'#FF4D4F',
+     desc:'Not Using Workspaces — Immediate Opportunity', descSub:'Sorted by license count — largest accounts represent highest recovery value', bg:'#FF4D4F12'},
+  ];
 
   el.innerHTML = `
-    <!-- Hero KPI row -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:4px">
-      ${[
-        {icon:'🏆', label:'Champions',   val:champions.length,  lic:champLic,    sub:'≥ 80% WS adoption',  color:'var(--green)'},
-        {icon:'📈', label:'Growing',     val:growing.length,    lic:growLic,     sub:'50–79% WS adoption',  color:'var(--accent)'},
-        {icon:'🔄', label:'Building',    val:building.length,   lic:buildLic,    sub:'20–49% WS adoption',  color:'var(--purple)'},
-        {icon:'⚠️', label:'Low Adoption',val:low.length,        lic:lowLic,      sub:'1–19% WS adoption',   color:'#FFA000'},
-        {icon:'❌', label:'Not Started', val:notStarted.length, lic:notStartLic, sub:'0% WS adoption',      color:'var(--red)'},
-      ].map(k=>`
-        <div style="background:var(--card);border-radius:10px;padding:14px 16px;border-top:3px solid ${k.color}">
-          <div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${k.icon} ${k.label}</div>
-          <div style="font-size:1.7rem;font-weight:800;color:${k.color}">${k.val}</div>
-          <div style="font-size:.68rem;color:var(--muted);margin-top:2px">${k.sub}</div>
-          <div style="font-size:.72rem;color:var(--fg);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);display:flex;align-items:center;gap:4px">
-            <span style="color:var(--muted)">Licenses:</span>
-            <span style="font-weight:700;color:${k.color}">${Math.round(k.lic).toLocaleString()}</span>
+    <!-- KPI cards — each card IS the tab selector -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;flex-shrink:0">
+      ${CATS.map(k => {
+        const isAct = (_activeSpotlightTab === k.id);
+        const lic   = k.rows.reduce((s,d)=>s+d.total_lic,0);
+        return `
+        <div class="sp-kpi-tab" data-panel="${k.id}" data-color="${k.color}"
+          onclick="switchSpotlightTab('${k.id}')"
+          style="background:${isAct ? k.color+'14' : 'var(--card)'};
+                 border-radius:10px;padding:14px 16px;cursor:pointer;
+                 border:${isAct ? '2px solid '+k.color : '1px solid var(--border)'};
+                 border-top:3px solid ${k.color};
+                 transform:${isAct ? 'translateY(-2px)' : ''};
+                 box-shadow:${isAct ? '0 6px 20px '+k.color+'30' : 'none'};
+                 transition:all .18s">
+          <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${k.icon} ${k.label}</div>
+          <div style="font-size:1.7rem;font-weight:800;color:${k.color};line-height:1">${k.rows.length}</div>
+          <div style="font-size:.67rem;color:var(--muted);margin-top:3px">${k.sub}</div>
+          <div style="margin-top:8px;padding-top:7px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:.67rem;color:var(--muted)">Licenses</span>
+            <span class="sp-count-chip" style="font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:10px;
+              background:${isAct ? k.color+'33' : 'var(--border)'};
+              color:${isAct ? k.color : 'var(--muted)'}">${Math.round(lic).toLocaleString()}</span>
           </div>
-        </div>`).join('')}
+          ${isAct ? `<div style="margin-top:6px;font-size:.65rem;color:${k.color};font-weight:600;text-align:center;letter-spacing:.03em">▼ viewing below</div>` : ''}
+        </div>`;
+      }).join('')}
     </div>
 
-
-    <!-- Sub-tab navigation for tables -->
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px" id="spotlight-subtabs">
-      ${[
-        {id:'sp-champions', icon:'🏆', label:'Champions',    count:champions.length, color:'#00D68F'},
-        {id:'sp-growing',   icon:'📈', label:'Growing',      count:growing.length,   color:'#00C2CB'},
-        {id:'sp-building',  icon:'🔄', label:'Building',     count:building.length,  color:'#7B5EA7'},
-        {id:'sp-low',       icon:'⚠️', label:'Low Adoption', count:low.length,       color:'#FFA000'},
-        {id:'sp-notstarted',icon:'❌', label:'Not Started',  count:notStarted.length,color:'#FF4D4F'},
-      ].map((t)=>{const isAct = (_activeSpotlightTab===t.id); return `
-        <button class="sp-tab-btn" data-panel="${t.id}" style="
-          padding:8px 16px;border-radius:8px;border:1px solid ${isAct?t.color:'var(--border)'};
-          background:${isAct?t.color+'18':'var(--card)'};color:${isAct?t.color:'var(--muted)'};
-          font-size:.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;
-          transition:all .2s" data-color="${t.color}">
-          <span>${t.icon}</span>
-          <span>${t.label}</span>
-          <span style="background:${isAct?t.color+'33':'var(--border)'};padding:1px 8px;border-radius:10px;font-size:.7rem;font-weight:700;color:${isAct?t.color:'var(--muted)'}">${t.count}</span>
-        </button>`;}).join('')}
+    <!-- Adoption distribution bar -->
+    <div style="background:var(--card);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:16px;flex-shrink:0">
+      <div style="font-size:.74rem;color:var(--muted);white-space:nowrap">WS Adoption</div>
+      <div style="flex:1;height:10px;background:var(--border);border-radius:6px;overflow:hidden;display:flex">
+        ${CATS.map(c=>`<div style="width:${(c.rows.length/fd.length*100).toFixed(1)}%;height:100%;background:${c.color}"></div>`).join('')}
+      </div>
+      <div style="font-size:.74rem;color:var(--muted);white-space:nowrap">${Math.round(totalWS)} / ${Math.round(totalLic)} WS users · ${(avgAdopt*100).toFixed(1)}% avg</div>
     </div>
 
-    <!-- Champions section -->
-    <div id="sp-champions" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-champions'?'block':'none'}">
-      <div style="background:var(--card);border-radius:10px;overflow:hidden">
-        <div style="padding:14px 18px;background:#00D68F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.1rem">🏆</span>
+    <!-- Section panels — only the active one is shown -->
+    ${CATS.map(k => `
+    <div id="${k.id}" class="sp-tab-panel" style="display:${_activeSpotlightTab===k.id?'block':'none'}">
+      <div style="background:var(--card);border-radius:10px;overflow:hidden;border-top:2px solid ${k.color}">
+        <div style="padding:12px 18px;background:${k.bg};border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.05rem">${k.icon}</span>
           <div>
-            <div style="font-weight:700;color:var(--green)">Champions — Success Story Candidates</div>
-            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${champions.length} accounts at ≥ 80% WS adoption · These customers are your best references and case study candidates</div>
+            <div style="font-weight:700;color:${k.color}">${k.desc}</div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${k.rows.length} accounts · ${k.descSub}</div>
           </div>
         </div>
-        ${tableRows(champions)}
+        ${tableRows(k.rows)}
       </div>
-    </div>
-
-    <!-- Growing section -->
-    <div id="sp-growing" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-growing'?'block':'none'}">
-      <div style="background:var(--card);border-radius:10px;overflow:hidden">
-        <div style="padding:14px 18px;background:#00C2CB12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.1rem">📈</span>
-          <div>
-            <div style="font-weight:700;color:var(--accent)">Growing — Almost There</div>
-            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${growing.length} accounts at 50–79% WS adoption · Close to champion status — a quick CSM check-in could push them over</div>
-          </div>
-        </div>
-        ${tableRows(growing)}
-      </div>
-    </div>
-
-    <!-- Building section -->
-    <div id="sp-building" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-building'?'block':'none'}">
-      <div style="background:var(--card);border-radius:10px;overflow:hidden">
-        <div style="padding:14px 18px;background:#7B5EA712;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.1rem">🔄</span>
-          <div>
-            <div style="font-weight:700;color:var(--purple)">Building Momentum — Nurture These</div>
-            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${building.length} accounts at 20–49% WS adoption · Training underway — focus on post-training follow-up cadence</div>
-          </div>
-        </div>
-        ${tableRows(building)}
-      </div>
-    </div>
-
-    <!-- Low Adoption section -->
-    <div id="sp-low" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-low'?'block':'none'}">
-      <div style="background:var(--card);border-radius:10px;overflow:hidden">
-        <div style="padding:14px 18px;background:#FFA00012;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.1rem">⚠️</span>
-          <div>
-            <div style="font-weight:700;color:#FFA000">Low Adoption — Needs Attention</div>
-            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${low.length} accounts at 1–19% WS adoption · Started but stalled — prioritize re-engagement and check training status</div>
-          </div>
-        </div>
-        ${tableRows(low)}
-      </div>
-    </div>
-
-    <!-- Not Started section -->
-    <div id="sp-notstarted" class="sp-tab-panel" style="display:${_activeSpotlightTab==='sp-notstarted'?'block':'none'}">
-      <div style="background:var(--card);border-radius:10px;overflow:hidden">
-        <div style="padding:14px 18px;background:#FF4D4F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.1rem">❌</span>
-          <div>
-            <div style="font-weight:700;color:var(--red)">Not Using Workspaces — Immediate Opportunity</div>
-            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${notStarted.length} accounts at 0% WS adoption · Sorted by license count — largest accounts represent highest recovery value</div>
-          </div>
-        </div>
-        ${tableRows(notStarted)}
-      </div>
-    </div>
+    </div>`).join('')}
   `;
 }
 
