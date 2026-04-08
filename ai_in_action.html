@@ -288,6 +288,7 @@
     <button class="sub-btn sub-active" onclick="switchSubView('insights',this)">💡 Insights</button>
     <button class="sub-btn" onclick="switchSubView('csm',this)">📊 CSM Performance &amp; Coverage</button>
     <button class="sub-btn" onclick="switchSubView('pt',this)">🚀 Pipeline</button>
+    <button class="sub-btn" onclick="switchSubView('spotlight',this)">🌟 Customer Spotlight</button>
   </div>
 
   <!-- TAB 1: Insights -->
@@ -372,6 +373,11 @@
 
 
 <footer>SeekOut &copy; Copyright <span id="footer-year"></span></footer>
+
+  <!-- TAB 4: Customer Spotlight -->
+  <div id="sub-spotlight" style="display:none;flex-direction:column;gap:16px;padding-bottom:16px;min-height:0;overflow-y:auto">
+    <div id="spotlight-content"></div>
+  </div>
 
 <script>
 const RAW = [
@@ -1804,7 +1810,7 @@ let activeSubView = 'insights';
 let activePLView  = 'posttraining';
 function switchSubView(view, btn){
   activeSubView = view;
-  ['insights','csm','pt'].forEach(v=>{
+  ['insights','csm','pt','spotlight'].forEach(v=>{
     const d=document.getElementById('sub-'+v);
     if(d){ d.style.display='none'; }
   });
@@ -2744,6 +2750,158 @@ function renderPTTracker(fd){
 
 
 // ── Main render ───────────────────────────────────────────────────────────────
+// ── Customer Spotlight ────────────────────────────────────────────────────────
+function renderSpotlight(fd){
+  const el = document.getElementById('spotlight-content');
+  if(!el) return;
+
+  if(fd.length === 0){
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">No accounts match the current filters.</div>';
+    return;
+  }
+
+  // Categorise accounts by WS adoption %
+  const champions = fd.filter(d => d.ws_adopt_pct >= 0.8 && d.ws_lic > 0).sort((a,b)=>b.ws_adopt_pct-a.ws_adopt_pct||b.ws_lic-a.ws_lic);
+  const growing   = fd.filter(d => d.ws_adopt_pct >= 0.5 && d.ws_adopt_pct < 0.8).sort((a,b)=>b.ws_adopt_pct-a.ws_adopt_pct);
+  const building  = fd.filter(d => d.ws_adopt_pct >= 0.2 && d.ws_adopt_pct < 0.5).sort((a,b)=>b.ws_adopt_pct-a.ws_adopt_pct);
+  const low       = fd.filter(d => d.ws_adopt_pct > 0   && d.ws_adopt_pct < 0.2).sort((a,b)=>b.ws_adopt_pct-a.ws_adopt_pct);
+  const notStarted= fd.filter(d => d.ws_adopt_pct === 0 || d.ws_lic === 0).sort((a,b)=>b.total_lic-a.total_lic);
+
+  const avgAdopt  = fd.reduce((s,d)=>s+d.ws_adopt_pct,0) / (fd.length||1);
+  const totalWS   = fd.reduce((s,d)=>s+d.ws_lic,0);
+  const totalLic  = fd.reduce((s,d)=>s+d.total_lic,0);
+
+  // Tier label helper
+  const TL = {T1:'Tier 1',T2:'Tier 2',T3:'Tier 3',T4:'Tier 4'};
+
+  // Adoption bar helper
+  const bar = (pct, color) => `<div style="display:flex;align-items:center;gap:8px">
+    <div style="flex:1;height:7px;background:var(--border);border-radius:4px;min-width:60px">
+      <div style="width:${Math.min(pct*100,100).toFixed(0)}%;height:100%;border-radius:4px;background:${color}"></div>
+    </div>
+    <span style="font-size:.75rem;font-weight:700;color:${color};min-width:38px;text-align:right">${(pct*100).toFixed(1)}%</span>
+  </div>`;
+
+  // Adoption category badge
+  const badge = (pct) => {
+    if(pct>=0.8) return '<span style="background:#00D68F22;color:#00D68F;font-size:.68rem;padding:2px 7px;border-radius:10px;font-weight:700">🏆 Champion</span>';
+    if(pct>=0.5) return '<span style="background:#00C2CB22;color:#00C2CB;font-size:.68rem;padding:2px 7px;border-radius:10px;font-weight:700">📈 Growing</span>';
+    if(pct>=0.2) return '<span style="background:#7B5EA722;color:#7B5EA7;font-size:.68rem;padding:2px 7px;border-radius:10px;font-weight:700">🔄 Building</span>';
+    if(pct> 0)   return '<span style="background:#FFA00022;color:#FFA000;font-size:.68rem;padding:2px 7px;border-radius:10px;font-weight:700">⚠️ Low</span>';
+    return '<span style="background:#FF4D4F22;color:#FF4D4F;font-size:.68rem;padding:2px 7px;border-radius:10px;font-weight:700">❌ Not Started</span>';
+  };
+
+  // Build a section table
+  const tableRows = (rows, limit) => {
+    const shown = limit ? rows.slice(0, limit) : rows;
+    if(!shown.length) return '<div style="padding:12px;color:var(--muted);font-size:.8rem;text-align:center">No accounts in this category</div>';
+    return `<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:.76rem">
+      <thead><tr style="border-bottom:1px solid var(--border)">
+        <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Account</th>
+        <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">CSM</th>
+        <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Tier</th>
+        <th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600">Licenses</th>
+        <th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600">WS Users</th>
+        <th style="padding:8px 10px;min-width:160px;color:var(--muted);font-weight:600">WS Adoption</th>
+        <th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Status</th>
+      </tr></thead>
+      <tbody>${shown.map((d,i)=>`
+        <tr style="border-bottom:1px solid var(--border);${i%2===0?'':'background:#ffffff06'}">
+          <td style="padding:8px 10px;font-weight:600;color:var(--fg)">${d.account}</td>
+          <td style="padding:8px 10px;color:var(--muted)">${d.csm.split(' ')[0]}</td>
+          <td style="padding:8px 10px">${d.tier?`<span style="font-size:.7rem;padding:2px 7px;border-radius:4px;background:${{T1:'#00C2CB',T2:'#7B5EA7',T3:'#FFA000',T4:'#555'}[d.tier]||'#555'}22;color:${{T1:'#00C2CB',T2:'#7B5EA7',T3:'#FFA000',T4:'#888'}[d.tier]||'#888'};font-weight:700">${TL[d.tier]||d.tier}</span>`:''}</td>
+          <td style="padding:8px 10px;text-align:right;color:var(--muted)">${Math.round(d.total_lic)}</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--accent)">${Math.round(d.ws_lic)}</td>
+          <td style="padding:8px 10px">${bar(d.ws_adopt_pct, d.ws_adopt_pct>=0.8?'#00D68F':d.ws_adopt_pct>=0.5?'#00C2CB':d.ws_adopt_pct>=0.2?'#7B5EA7':'#FFA000')}</td>
+          <td style="padding:8px 10px">${badge(d.ws_adopt_pct)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>${rows.length>limit?`<div style="padding:8px 12px;font-size:.74rem;color:var(--muted)">${rows.length-limit} more accounts not shown — use CSM or Tier filter to narrow down.</div>`:''}</div>`;
+  };
+
+  el.innerHTML = `
+    <!-- Hero KPI row -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:4px">
+      ${[
+        {icon:'🏆', label:'Champions',   val:champions.length,  sub:'≥ 80% WS adoption',  color:'var(--green)'},
+        {icon:'📈', label:'Growing',     val:growing.length,    sub:'50–79% WS adoption',  color:'var(--accent)'},
+        {icon:'🔄', label:'Building',    val:building.length,   sub:'20–49% WS adoption',  color:'var(--purple)'},
+        {icon:'⚠️', label:'Low Adoption',val:low.length,        sub:'1–19% WS adoption',   color:'#FFA000'},
+        {icon:'❌', label:'Not Started', val:notStarted.length, sub:'0% WS adoption',      color:'var(--red)'},
+      ].map(k=>`
+        <div style="background:var(--card);border-radius:10px;padding:14px 16px;border-top:3px solid ${k.color}">
+          <div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${k.icon} ${k.label}</div>
+          <div style="font-size:1.7rem;font-weight:800;color:${k.color}">${k.val}</div>
+          <div style="font-size:.68rem;color:var(--muted);margin-top:2px">${k.sub}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- Overall adoption bar -->
+    <div style="background:var(--card);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:20px">
+      <div style="font-size:.75rem;color:var(--muted);white-space:nowrap">Overall WS Adoption</div>
+      <div style="flex:1;height:10px;background:var(--border);border-radius:6px;overflow:hidden">
+        ${[
+          {pct:champions.length/fd.length, color:'#00D68F'},
+          {pct:growing.length/fd.length,   color:'#00C2CB'},
+          {pct:building.length/fd.length,  color:'#7B5EA7'},
+          {pct:low.length/fd.length,       color:'#FFA000'},
+          {pct:notStarted.length/fd.length,color:'#FF4D4F'},
+        ].map(s=>`<div style="width:${(s.pct*100).toFixed(1)}%;height:100%;background:${s.color};display:inline-block"></div>`).join('')}
+      </div>
+      <div style="font-size:.75rem;color:var(--muted);white-space:nowrap">${Math.round(totalWS)} of ${Math.round(totalLic)} WS users (${(avgAdopt*100).toFixed(1)}% avg)</div>
+    </div>
+
+    <!-- Champions section -->
+    <div style="background:var(--card);border-radius:10px;overflow:hidden">
+      <div style="padding:14px 18px;background:#00D68F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.1rem">🏆</span>
+        <div>
+          <div style="font-weight:700;color:var(--green)">Champions — Success Story Candidates</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${champions.length} accounts at ≥ 80% WS adoption · These customers are your best references and case study candidates</div>
+        </div>
+      </div>
+      ${tableRows(champions, 20)}
+    </div>
+
+    <!-- Growing section -->
+    <div style="background:var(--card);border-radius:10px;overflow:hidden">
+      <div style="padding:14px 18px;background:#00C2CB12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.1rem">📈</span>
+        <div>
+          <div style="font-weight:700;color:var(--accent)">Growing — Almost There</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${growing.length} accounts at 50–79% WS adoption · Close to champion status — a quick CSM check-in could push them over</div>
+        </div>
+      </div>
+      ${tableRows(growing, 15)}
+    </div>
+
+    <!-- Building section -->
+    <div style="background:var(--card);border-radius:10px;overflow:hidden">
+      <div style="padding:14px 18px;background:#7B5EA712;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.1rem">🔄</span>
+        <div>
+          <div style="font-weight:700;color:var(--purple)">Building Momentum — Nurture These</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${building.length} accounts at 20–49% WS adoption · Training underway — focus on post-training follow-up cadence</div>
+        </div>
+      </div>
+      ${tableRows(building, 15)}
+    </div>
+
+    <!-- Not Started section -->
+    <div style="background:var(--card);border-radius:10px;overflow:hidden">
+      <div style="padding:14px 18px;background:#FF4D4F12;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.1rem">❌</span>
+        <div>
+          <div style="font-weight:700;color:var(--red)">Not Using Workspaces — Immediate Opportunity</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${notStarted.length} accounts at 0% WS adoption · Sorted by license count — largest accounts represent highest recovery value</div>
+        </div>
+      </div>
+      ${tableRows(notStarted, 25)}
+    </div>
+  `;
+}
+
+
 function render(){
   const fd = filtered();
   const kpi = renderKPIs(fd);
@@ -2755,6 +2913,7 @@ function render(){
   renderPTTracker(fd);
   renderUntouchedAccounts(fd);
   renderActivePipeline(fd);
+  renderSpotlight(fd);
 }
 
 // ── Export CSV ────────────────────────────────────────────────────────────────
