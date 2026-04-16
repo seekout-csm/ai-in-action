@@ -136,7 +136,9 @@
 
   /* PT tracker KPIs */
   .pt-kpi{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px;
-    box-shadow:0 2px 10px rgba(158,0,240,.04);}
+    box-shadow:0 2px 10px rgba(158,0,240,.04);cursor:pointer;transition:all .2s ease;user-select:none;}
+  .pt-kpi:hover{border-color:rgba(255,255,255,.18);box-shadow:0 2px 14px rgba(158,0,240,.10);}
+  .pt-kpi.kpi-active{border-color:rgba(255,255,255,.3);box-shadow:0 0 0 2px rgba(0,194,203,.3),0 2px 14px rgba(158,0,240,.12);}
   .pt-kpi.fu{border-left:4px solid var(--red);}
   .pt-kpi.prog{border-left:4px solid var(--orange);}
   .pt-kpi.well{border-left:4px solid var(--green);}
@@ -2435,12 +2437,20 @@ function renderUntouchedAccounts(fd){
 }
 
 // ── Active Pipeline (In Training + Meeting Set) ───────────────────────────────
+// ── Active Pipeline KPI filter state (mutually exclusive) ────────────────────
+let activePipeKpiFilter = null; // null = no filter, or one of 'in_prog','meeting','no_meeting','not_pri'
+
+function toggleActivePipeKpi(cat){
+  activePipeKpiFilter = activePipeKpiFilter === cat ? null : cat;
+  render();
+}
+
 function renderActivePipeline(fd){
   const box=document.getElementById('pl-activepipe-content');
   if(!box) return;
 
   const ACTIVE_CATS = ['in_prog','meeting','no_meeting','not_pri'];
-  const accts=fd.filter(d=>ACTIVE_CATS.includes(d.wp_cat)&&!EXCL.has(d.csm))
+  const allAccts=fd.filter(d=>ACTIVE_CATS.includes(d.wp_cat)&&!EXCL.has(d.csm))
     .map(d=>{
       const sd=SEARCH_DATA[d.account]||{s:0,sl:0};
       return {...d, wsPct:d.ws_adopt_pct*100, srchPct:sd.s*100, srchLic:sd.sl};
@@ -2451,13 +2461,27 @@ function renderActivePipeline(fd){
       return d!==0?d:b.total_lic-a.total_lic;
     });
 
-  const total=accts.length;
-  const inProg=accts.filter(a=>a.wp_cat==='in_prog').length;
-  const mtgSet=accts.filter(a=>a.wp_cat==='meeting').length;
-  const noMtg=accts.filter(a=>a.wp_cat==='no_meeting').length;
-  const notPri=accts.filter(a=>a.wp_cat==='not_pri').length;
-  const totalLic=accts.reduce((s,a)=>s+a.total_lic,0);
-  const avgWS=totalLic>0?accts.reduce((s,a)=>s+a.ws_lic,0)/totalLic*100:0;
+  // Apply KPI filter for tables (but KPI counts always show full numbers)
+  const accts = activePipeKpiFilter ? allAccts.filter(a=>a.wp_cat===activePipeKpiFilter) : allAccts;
+
+  const total=allAccts.length;
+  const filteredTotal=accts.length;
+  const inProg=allAccts.filter(a=>a.wp_cat==='in_prog').length;
+  const mtgSet=allAccts.filter(a=>a.wp_cat==='meeting').length;
+  const noMtg=allAccts.filter(a=>a.wp_cat==='no_meeting').length;
+  const notPri=allAccts.filter(a=>a.wp_cat==='not_pri').length;
+  const totalLic=allAccts.reduce((s,a)=>s+a.total_lic,0);
+  const avgWS=totalLic>0?allAccts.reduce((s,a)=>s+a.ws_lic,0)/totalLic*100:0;
+
+  // Per-status license breakdowns
+  const licByStatus={};
+  const wsByStatus={};
+  ACTIVE_CATS.forEach(cat=>{
+    const catAccts=allAccts.filter(a=>a.wp_cat===cat);
+    licByStatus[cat]=catAccts.reduce((s,a)=>s+a.total_lic,0);
+    const catTotalLic=licByStatus[cat];
+    wsByStatus[cat]=catTotalLic>0?catAccts.reduce((s,a)=>s+a.ws_lic,0)/catTotalLic*100:0;
+  });
 
   // CSM breakdown
   const csmMap={};
@@ -2523,32 +2547,31 @@ function renderActivePipeline(fd){
   box.innerHTML=`
     <div class="panel accent-top" style="margin-bottom:14px">
       <div class="panel-title" style="margin-bottom:12px">⚡ Active Pipeline — All Accounts in the Training &amp; Scheduling Funnel</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px">
-        <div class="pt-kpi" style="border-left:4px solid var(--orange)">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:8px">
+        <div class="pt-kpi${activePipeKpiFilter==='in_prog'?' kpi-active':''}" style="border-left:4px solid var(--orange)" onclick="toggleActivePipeKpi('in_prog')">
           <div class="pt-kpi-lbl">In Training</div>
           <div class="pt-kpi-val" style="color:var(--orange)">${inProg}</div>
-          <div class="pt-kpi-sub">Active Workspaces sessions</div>
+          <div class="pt-kpi-sub">${Math.round(licByStatus.in_prog).toLocaleString()} licenses · ${wsByStatus.in_prog.toFixed(0)}% WS</div>
         </div>
-        <div class="pt-kpi" style="border-left:4px solid var(--accent)">
+        <div class="pt-kpi${activePipeKpiFilter==='meeting'?' kpi-active':''}" style="border-left:4px solid var(--accent)" onclick="toggleActivePipeKpi('meeting')">
           <div class="pt-kpi-lbl">Meeting Set</div>
           <div class="pt-kpi-val" style="color:var(--accent)">${mtgSet}</div>
-          <div class="pt-kpi-sub">Session scheduled</div>
+          <div class="pt-kpi-sub">${Math.round(licByStatus.meeting).toLocaleString()} licenses · ${wsByStatus.meeting.toFixed(0)}% WS</div>
         </div>
-        <div class="pt-kpi" style="border-left:4px solid var(--red)">
+        <div class="pt-kpi${activePipeKpiFilter==='no_meeting'?' kpi-active':''}" style="border-left:4px solid var(--red)" onclick="toggleActivePipeKpi('no_meeting')">
           <div class="pt-kpi-lbl">No Meeting Set</div>
           <div class="pt-kpi-val" style="color:var(--red)">${noMtg}</div>
-          <div class="pt-kpi-sub">Priority — needs scheduling</div>
+          <div class="pt-kpi-sub">${Math.round(licByStatus.no_meeting).toLocaleString()} licenses · ${wsByStatus.no_meeting.toFixed(0)}% WS</div>
         </div>
-        <div class="pt-kpi" style="border-left:4px solid var(--muted)">
+        <div class="pt-kpi${activePipeKpiFilter==='not_pri'?' kpi-active':''}" style="border-left:4px solid var(--muted)" onclick="toggleActivePipeKpi('not_pri')">
           <div class="pt-kpi-lbl">Not Prioritized</div>
           <div class="pt-kpi-val" style="color:var(--muted)">${notPri}</div>
-          <div class="pt-kpi-sub">Review for re-engagement</div>
+          <div class="pt-kpi-sub">${Math.round(licByStatus.not_pri).toLocaleString()} licenses · ${wsByStatus.not_pri.toFixed(0)}% WS</div>
         </div>
-        <div class="pt-kpi" style="border-left:4px solid var(--purple)">
-          <div class="pt-kpi-lbl">Licenses in Pipeline</div>
-          <div class="pt-kpi-val" style="color:var(--purple)">${Math.round(totalLic).toLocaleString()}</div>
-          <div class="pt-kpi-sub">Avg WS adoption: ${avgWS.toFixed(1)}%</div>
-        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding:0 2px">
+        <div style="font-size:.72rem;color:var(--muted)">📊 Total Pipeline: <strong style="color:var(--purple)">${Math.round(totalLic).toLocaleString()}</strong> licenses · Avg WS adoption: <strong style="color:var(--accent)">${avgWS.toFixed(1)}%</strong></div>
+        <div style="font-size:.68rem;color:var(--muted);font-style:italic">${activePipeKpiFilter?'🔍 Filtered by status — click KPI again to clear':'💡 Click a KPI card to filter the tables below'}</div>
       </div>
     </div>
     <div class="charts-2" style="margin-bottom:14px">
@@ -2576,7 +2599,7 @@ function renderActivePipeline(fd){
             const cnt=accts.filter(a=>a.tier===t).length;
             if(!cnt) return '';
             const tc=TIER_COLORS[t];
-            const pct=Math.round(cnt/total*100);
+            const pct=Math.round(cnt/filteredTotal*100);
             return `<div style="display:flex;align-items:center;gap:10px">
               <span style="background:${tc}22;color:${tc};font-size:.68rem;font-weight:700;padding:2px 10px;border-radius:10px;min-width:56px;text-align:center">${TIER_LABEL[t]}</span>
               <div style="flex:1;background:var(--border);border-radius:4px;height:8px">
@@ -2588,7 +2611,7 @@ function renderActivePipeline(fd){
       </div>
     </div>
     <div class="panel" style="padding:14px 16px">
-      <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:10px">Account-Level Detail <span style="font-weight:400;color:var(--muted);font-size:.72rem">(${total} accounts)</span></div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:10px">Account-Level Detail <span style="font-weight:400;color:var(--muted);font-size:.72rem">(${filteredTotal}${activePipeKpiFilter?' of '+total:''} accounts)</span></div>
       <div class="table-wrap">
         <table class="data-table" style="min-width:900px">
           <thead><tr>
