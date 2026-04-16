@@ -2333,11 +2333,19 @@ function renderCoverage(fd){
 }
 
 // ── Untouched Accounts (not in Weekly Progress) ───────────────────────────────
+// ── Untouched Accounts KPI filter state (mutually exclusive) ─────────────────
+let untouchedKpiFilter = null; // null = no filter, or 'search','none','ws'
+
+function toggleUntouchedKpi(seg){
+  untouchedKpiFilter = untouchedKpiFilter === seg ? null : seg;
+  render();
+}
+
 function renderUntouchedAccounts(fd){
   const box = document.getElementById('pl-untouched-content');
   if(!box) return;
 
-  const accts = fd.filter(d=>d.wp_cat===''&&!EXCL.has(d.csm)).map(d=>{
+  const allAccts = fd.filter(d=>d.wp_cat===''&&!EXCL.has(d.csm)).map(d=>{
     const sd=SEARCH_DATA[d.account]||{s:0,sl:0};
     const wsPct=d.ws_adopt_pct*100, srchPct=sd.s*100;
     const seg=wsPct>0?'ws':(srchPct>0?'search':'none');
@@ -2348,10 +2356,21 @@ function renderUntouchedAccounts(fd){
     return d!==0?d:b.srchPct-a.srchPct;
   });
 
-  const total=accts.length,wsActive=accts.filter(a=>a.seg==='ws').length;
-  const srchOnly=accts.filter(a=>a.seg==='search').length,noneActive=accts.filter(a=>a.seg==='none').length;
-  const totalLic=accts.reduce((s,a)=>s+a.total_lic,0);
-  const srchOnlyLic=accts.filter(a=>a.seg==='search').reduce((s,a)=>s+a.total_lic,0);
+  // Apply KPI filter for tables (KPI counts always show full numbers)
+  const accts = untouchedKpiFilter ? allAccts.filter(a=>a.seg===untouchedKpiFilter) : allAccts;
+
+  const total=allAccts.length,wsActive=allAccts.filter(a=>a.seg==='ws').length;
+  const srchOnly=allAccts.filter(a=>a.seg==='search').length,noneActive=allAccts.filter(a=>a.seg==='none').length;
+  const totalLic=allAccts.reduce((s,a)=>s+a.total_lic,0);
+  const srchOnlyLic=allAccts.filter(a=>a.seg==='search').reduce((s,a)=>s+a.total_lic,0);
+  const filteredTotal=accts.length;
+
+  // Per-segment license breakdowns
+  const licBySeg={}, wsBySeg={};
+  ['search','none','ws'].forEach(seg=>{
+    const segAccts=allAccts.filter(a=>a.seg===seg);
+    licBySeg[seg]=segAccts.reduce((s,a)=>s+a.total_lic,0);
+  });
 
   const csmSrch={};
   accts.filter(a=>a.seg==='search').forEach(a=>{csmSrch[a.csm]=(csmSrch[a.csm]||0)+1;});
@@ -2394,33 +2413,32 @@ function renderUntouchedAccounts(fd){
     <div class="panel accent-top" style="margin-bottom:14px">
       <div class="panel-title" style="margin-bottom:12px">🔍 Untouched Accounts — No Weekly Progress Action Yet</div>
       <div style="font-size:.77rem;color:var(--muted);margin-bottom:14px">These accounts have no training or WP status recorded. Accounts using <strong style="color:#FFA000">Search</strong> are prime targets — they already use SeekOut but haven't adopted Workspaces.</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-        <div class="pt-kpi" style="border-left:4px solid var(--muted)">
-          <div class="pt-kpi-lbl">Total Untouched</div>
-          <div class="pt-kpi-val" style="color:var(--text)">${total}</div>
-          <div class="pt-kpi-sub">${Math.round(totalLic).toLocaleString()} total licenses</div>
-        </div>
-        <div class="pt-kpi" style="border-left:4px solid #FFA000">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:8px">
+        <div class="pt-kpi${untouchedKpiFilter==='search'?' kpi-active':''}" style="border-left:4px solid #FFA000" onclick="toggleUntouchedKpi('search')">
           <div class="pt-kpi-lbl">🔍 Search-Only (High Priority)</div>
           <div class="pt-kpi-val" style="color:#FFA000">${srchOnly}</div>
-          <div class="pt-kpi-sub">${Math.round(srchOnlyLic).toLocaleString()} licenses · using SeekOut Search</div>
-          <div class="pt-kpi-detail" style="margin-top:6px">${topCsm}</div>
+          <div class="pt-kpi-sub">${Math.round(licBySeg.search).toLocaleString()} licenses · using SeekOut Search</div>
         </div>
-        <div class="pt-kpi" style="border-left:4px solid var(--muted)">
+        <div class="pt-kpi${untouchedKpiFilter==='none'?' kpi-active':''}" style="border-left:4px solid var(--muted)" onclick="toggleUntouchedKpi('none')">
           <div class="pt-kpi-lbl">No Feature Activity</div>
           <div class="pt-kpi-val" style="color:var(--muted)">${noneActive}</div>
-          <div class="pt-kpi-sub">No Search, Rediscovery or WS usage</div>
+          <div class="pt-kpi-sub">${Math.round(licBySeg.none).toLocaleString()} licenses · No Search, Rediscovery or WS</div>
         </div>
-        <div class="pt-kpi" style="border-left:4px solid var(--accent)">
+        <div class="pt-kpi${untouchedKpiFilter==='ws'?' kpi-active':''}" style="border-left:4px solid var(--accent)" onclick="toggleUntouchedKpi('ws')">
           <div class="pt-kpi-lbl">Already Using Workspaces</div>
           <div class="pt-kpi-val" style="color:var(--accent)">${wsActive}</div>
-          <div class="pt-kpi-sub">Self-adopted — no session scheduled</div>
+          <div class="pt-kpi-sub">${Math.round(licBySeg.ws).toLocaleString()} licenses · Self-adopted</div>
         </div>
       </div>
-      ${srchOnly>0?`<div style="margin-bottom:4px;font-size:.72rem;color:var(--muted)">Search-Only by Tier: ${tierSrchHtml}</div>`:''}
+      <div style="display:flex;justify-content:center;align-items:center;margin-bottom:14px;padding:0 2px">
+        <div style="font-size:.72rem;color:var(--muted)">📊 ${total} untouched accounts · ${Math.round(totalLic).toLocaleString()} total licenses</div>
+        <span style="margin:0 10px;color:var(--border)">|</span>
+        <div style="font-size:.68rem;color:var(--muted);font-style:italic">${untouchedKpiFilter?'🔍 Filtered by segment — click KPI again to clear':'💡 Click a KPI card to filter the tables below'}</div>
+      </div>
+      ${srchOnly>0&&!untouchedKpiFilter?`<div style="margin-bottom:4px;font-size:.72rem;color:var(--muted)">Search-Only by Tier: ${tierSrchHtml}</div>`:''}
     </div>
     <div class="panel" style="padding:14px 16px">
-      <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:10px">Account-Level Detail <span style="font-weight:400;color:var(--muted);font-size:.72rem">(${total} accounts · sorted by opportunity)</span></div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:10px">Account-Level Detail <span style="font-weight:400;color:var(--muted);font-size:.72rem">(${filteredTotal}${untouchedKpiFilter?' of '+total:''} accounts · sorted by opportunity)</span></div>
       <div class="table-wrap">
         <table class="data-table" style="min-width:680px">
           <thead><tr>
@@ -2569,8 +2587,9 @@ function renderActivePipeline(fd){
           <div class="pt-kpi-sub">${Math.round(licByStatus.not_pri).toLocaleString()} licenses · ${wsByStatus.not_pri.toFixed(0)}% WS</div>
         </div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding:0 2px">
+      <div style="display:flex;justify-content:center;align-items:center;margin-bottom:20px;padding:0 2px">
         <div style="font-size:.72rem;color:var(--muted)">📊 Total Pipeline: <strong style="color:var(--purple)">${Math.round(totalLic).toLocaleString()}</strong> licenses · Avg WS adoption: <strong style="color:var(--accent)">${avgWS.toFixed(1)}%</strong></div>
+        <span style="margin:0 10px;color:var(--border)">|</span>
         <div style="font-size:.68rem;color:var(--muted);font-style:italic">${activePipeKpiFilter?'🔍 Filtered by status — click KPI again to clear':'💡 Click a KPI card to filter the tables below'}</div>
       </div>
     </div>
@@ -2628,8 +2647,16 @@ function renderActivePipeline(fd){
 }
 
 // ── Post-Training Tracker ────────────────────────────────────────────────────
+// ── Post-Training KPI filter state (mutually exclusive) ──────────────────────
+let ptKpiFilter = null; // null = no filter, or 'followup','progressing','adopted'
+
+function togglePTKpi(band){
+  ptKpiFilter = ptKpiFilter === band ? null : band;
+  render();
+}
+
 function renderPTTracker(fd){
-  const ptAccts = fd.filter(d=>d.wp_cat==='post_train')
+  const allPtAccts = fd.filter(d=>d.wp_cat==='post_train')
     .map(d=>({...d, pct: d.total_lic>0 ? d.ws_adopt_pct*100 : 0}))
     .sort((a,b)=>a.pct-b.pct);
 
@@ -2640,14 +2667,21 @@ function renderPTTracker(fd){
     return              {label:'Excellent',col:'var(--green)', bg:'rgba(0,168,118,0.14)',icon:'✅', action:'Share as success story'};
   };
 
-  const ptCritical  = ptAccts.filter(a=>a.pct<20).length;
-  const ptGrowing   = ptAccts.filter(a=>a.pct>=20&&a.pct<50).length;
-  const ptStrong    = ptAccts.filter(a=>a.pct>=50&&a.pct<80).length;
-  const ptExcellent = ptAccts.filter(a=>a.pct>=80).length;
-  const ptTotal     = ptAccts.length;
+  const ptCritical  = allPtAccts.filter(a=>a.pct<20).length;
+  const ptGrowing   = allPtAccts.filter(a=>a.pct>=20&&a.pct<50).length;
+  const ptStrong    = allPtAccts.filter(a=>a.pct>=50&&a.pct<80).length;
+  const ptExcellent = allPtAccts.filter(a=>a.pct>=80).length;
+  const ptTotal     = allPtAccts.length;
   const needFU      = ptCritical + ptGrowing;
-  const strandedLic = ptAccts.filter(a=>a.pct<50).reduce((s,a)=>s+Math.max(0,Math.round(a.total_lic-a.ws_lic)),0);
+  const strandedLic = allPtAccts.filter(a=>a.pct<50).reduce((s,a)=>s+Math.max(0,Math.round(a.total_lic-a.ws_lic)),0);
   const fuPct       = ptTotal?Math.round(needFU/ptTotal*100):0;
+
+  // Apply KPI filter for tables
+  const ptAccts = ptKpiFilter==='followup' ? allPtAccts.filter(a=>a.pct<50)
+    : ptKpiFilter==='progressing' ? allPtAccts.filter(a=>a.pct>=50&&a.pct<80)
+    : ptKpiFilter==='adopted' ? allPtAccts.filter(a=>a.pct>=80)
+    : allPtAccts;
+  const ptFilteredTotal = ptAccts.length;
 
   // CSM FU breakdown
   const csmFU={};
@@ -2716,8 +2750,8 @@ function renderPTTracker(fd){
 
   el('exec-posttrain-table').innerHTML = `
     <!-- KPI Cards -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px">
-      <div style="background:rgba(229,62,62,0.08);border:1px solid rgba(229,62,62,0.3);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:8px">
+      <div style="background:rgba(229,62,62,0.08);border:1px solid ${ptKpiFilter==='followup'?'rgba(229,62,62,0.7)':'rgba(229,62,62,0.3)'};border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;cursor:pointer;transition:all .2s ease;user-select:none${ptKpiFilter==='followup'?';box-shadow:0 0 0 2px rgba(229,62,62,.3)':''}" onclick="togglePTKpi('followup')">
         <div style="position:absolute;top:10px;right:14px;font-size:1.6rem;opacity:.12">⚡</div>
         <div style="font-size:.67rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">Needs Follow-Up</div>
         <div style="font-size:2.2rem;font-weight:700;color:var(--red);line-height:1">${needFU}</div>
@@ -2726,24 +2760,27 @@ function renderPTTracker(fd){
           <span style="font-size:.7rem;color:var(--red);font-weight:600">${strandedLic.toLocaleString()} licenses</span>
           <span style="font-size:.7rem;color:var(--muted)"> not yet activated</span></div>
       </div>
-      <div style="background:rgba(255,125,0,0.06);border:1px solid rgba(255,125,0,0.25);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden">
+      <div style="background:rgba(255,125,0,0.06);border:1px solid ${ptKpiFilter==='progressing'?'rgba(255,125,0,0.7)':'rgba(255,125,0,0.25)'};border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;cursor:pointer;transition:all .2s ease;user-select:none${ptKpiFilter==='progressing'?';box-shadow:0 0 0 2px rgba(255,125,0,.3)':''}" onclick="togglePTKpi('progressing')">
         <div style="position:absolute;top:10px;right:14px;font-size:1.6rem;opacity:.12">📈</div>
         <div style="font-size:.67rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">Progressing</div>
         <div style="font-size:2.2rem;font-weight:700;color:var(--orange);line-height:1">${ptStrong}</div>
         <div style="font-size:.72rem;color:var(--muted);margin-top:4px">accounts at 50–80% adoption</div>
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,125,0,0.15)">
-          <span style="font-size:.7rem;color:var(--orange);font-weight:600">${ptAccts.filter(a=>a.pct>=50&&a.pct<80).reduce((s,a)=>s+Math.round(a.total_lic),0).toLocaleString()} licenses</span>
+          <span style="font-size:.7rem;color:var(--orange);font-weight:600">${allPtAccts.filter(a=>a.pct>=50&&a.pct<80).reduce((s,a)=>s+Math.round(a.total_lic),0).toLocaleString()} licenses</span>
           <span style="font-size:.7rem;color:var(--muted)"> · check-in to push past 80%</span></div>
       </div>
-      <div style="background:rgba(0,168,118,0.07);border:1px solid rgba(0,168,118,0.28);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden">
+      <div style="background:rgba(0,168,118,0.07);border:1px solid ${ptKpiFilter==='adopted'?'rgba(0,168,118,0.7)':'rgba(0,168,118,0.28)'};border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;cursor:pointer;transition:all .2s ease;user-select:none${ptKpiFilter==='adopted'?';box-shadow:0 0 0 2px rgba(0,168,118,.3)':''}" onclick="togglePTKpi('adopted')">
         <div style="position:absolute;top:10px;right:14px;font-size:1.6rem;opacity:.12">✅</div>
         <div style="font-size:.67rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">Well Adopted</div>
         <div style="font-size:2.2rem;font-weight:700;color:var(--green);line-height:1">${ptExcellent}</div>
         <div style="font-size:.72rem;color:var(--muted);margin-top:4px">accounts above 80% adoption</div>
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,168,118,0.18)">
-          <span style="font-size:.7rem;color:var(--green);font-weight:600">${ptAccts.filter(a=>a.pct>=80).reduce((s,a)=>s+Math.round(a.total_lic),0).toLocaleString()} licenses</span>
+          <span style="font-size:.7rem;color:var(--green);font-weight:600">${allPtAccts.filter(a=>a.pct>=80).reduce((s,a)=>s+Math.round(a.total_lic),0).toLocaleString()} licenses</span>
           <span style="font-size:.7rem;color:var(--muted)"> · leverage as success stories</span></div>
       </div>
+    </div>
+    <div style="text-align:center;margin-bottom:18px">
+      <span style="font-size:.68rem;color:var(--muted);font-style:italic">${ptKpiFilter?'🔍 Filtered by adoption band — click KPI again to clear':'💡 Click a KPI card to filter the tables below'}</span>
     </div>
     <!-- Customer Success Manager + Tier Follow-Up -->
     <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:18px">
@@ -2783,7 +2820,7 @@ function renderPTTracker(fd){
     </div>
     <!-- Account Detail -->
     <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px">
-      Account-Level Detail — ${ptTotal} Post-Training Accounts</div>
+      Account-Level Detail — ${ptFilteredTotal}${ptKpiFilter?' of '+ptTotal:''} Post-Training Accounts</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <span style="background:rgba(229,62,62,0.1);color:var(--red);font-size:.68rem;font-weight:700;padding:3px 10px;border-radius:10px">⚡ Critical: ${ptCritical} (&lt;20%)</span>
       <span style="background:rgba(255,125,0,0.1);color:var(--orange);font-size:.68rem;font-weight:700;padding:3px 10px;border-radius:10px">📈 Growing: ${ptGrowing} (20–50%)</span>
