@@ -2377,11 +2377,6 @@ function renderUntouchedAccounts(fd){
   const topCsm=Object.entries(csmSrch).sort((a,b)=>b[1]-a[1]).slice(0,5)
     .map(([c,n])=>`<span style="color:var(--text-mid);font-size:.72rem"><strong style="color:var(--text)">${c.split(' ')[0]}</strong> (${n})</span>`).join(' · ');
 
-  const tierSrch={};
-  accts.filter(a=>a.seg==='search').forEach(a=>{tierSrch[a.tier]=(tierSrch[a.tier]||0)+1;});
-  const tierSrchHtml=['T1','T2','T3','T4'].filter(t=>tierSrch[t])
-    .map(t=>`<span style="background:${TIER_COLORS[t]}22;color:${TIER_COLORS[t]};font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:10px">${TIER_LABEL[t]}: ${tierSrch[t]}</span>`).join(' ');
-
   const rows=accts.map(a=>{
     const segHtml=a.seg==='search'?`<span class="seg-search">🔍 Search Only</span>`
       :a.seg==='ws'?`<span class="seg-ws">✅ Using WS</span>`:`<span class="seg-none">— No Activity</span>`;
@@ -2411,7 +2406,8 @@ function renderUntouchedAccounts(fd){
 
   box.innerHTML=`
     <div class="panel accent-top" style="margin-bottom:14px">
-      <div class="panel-title" style="margin-bottom:12px">🔍 Untouched Accounts — No Weekly Progress Action Yet</div>
+      <div class="panel-title" style="margin-bottom:4px">🔍 Untouched Accounts — No Weekly Progress Action Yet</div>
+      <div style="font-size:.8rem;color:var(--text);margin-bottom:12px;font-weight:600">${total} accounts · ${Math.round(totalLic).toLocaleString()} total licenses</div>
       <div style="font-size:.77rem;color:var(--muted);margin-bottom:14px">These accounts have no training or WP status recorded. Accounts using <strong style="color:#FFA000">Search</strong> are prime targets — they already use SeekOut but haven't adopted Workspaces.</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:8px">
         <div class="pt-kpi${untouchedKpiFilter==='search'?' kpi-active':''}" style="border-left:4px solid #FFA000" onclick="toggleUntouchedKpi('search')">
@@ -2430,12 +2426,11 @@ function renderUntouchedAccounts(fd){
           <div class="pt-kpi-sub">${Math.round(licBySeg.ws).toLocaleString()} licenses · Self-adopted</div>
         </div>
       </div>
-      <div style="display:flex;justify-content:center;align-items:center;margin-bottom:14px;padding:0 2px">
-        <div style="font-size:.72rem;color:var(--muted)">📊 ${total} untouched accounts · ${Math.round(totalLic).toLocaleString()} total licenses</div>
-        <span style="margin:0 10px;color:var(--border)">|</span>
-        <div style="font-size:.68rem;color:var(--muted);font-style:italic">${untouchedKpiFilter?'🔍 Filtered by segment — click KPI again to clear':'💡 Click a KPI card to filter the tables below'}</div>
+      <div style="text-align:center;margin-bottom:14px;padding:0 2px">
+        ${untouchedKpiFilter
+          ?`<span style="font-size:.82rem;font-weight:700;color:var(--purple)">🔍 Filtered by segment — click KPI again to clear</span>`
+          :`<span style="font-size:.68rem;color:var(--muted);font-style:italic">💡 Click a KPI card to filter the tables below</span>`}
       </div>
-      ${srchOnly>0&&!untouchedKpiFilter?`<div style="margin-bottom:4px;font-size:.72rem;color:var(--muted)">Search-Only by Tier: ${tierSrchHtml}</div>`:''}
     </div>
     <div class="panel" style="padding:14px 16px">
       <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:10px">Account-Level Detail <span style="font-weight:400;color:var(--muted);font-size:.72rem">(${filteredTotal}${untouchedKpiFilter?' of '+total:''} accounts · sorted by opportunity)</span></div>
@@ -2587,10 +2582,10 @@ function renderActivePipeline(fd){
           <div class="pt-kpi-sub">${Math.round(licByStatus.not_pri).toLocaleString()} licenses · ${wsByStatus.not_pri.toFixed(0)}% WS</div>
         </div>
       </div>
-      <div style="display:flex;justify-content:center;align-items:center;margin-bottom:20px;padding:0 2px">
-        <div style="font-size:.72rem;color:var(--muted)">📊 Total Pipeline: <strong style="color:var(--purple)">${Math.round(totalLic).toLocaleString()}</strong> licenses · Avg WS adoption: <strong style="color:var(--accent)">${avgWS.toFixed(1)}%</strong></div>
-        <span style="margin:0 10px;color:var(--border)">|</span>
-        <div style="font-size:.68rem;color:var(--muted);font-style:italic">${activePipeKpiFilter?'🔍 Filtered by status — click KPI again to clear':'💡 Click a KPI card to filter the tables below'}</div>
+      <div style="text-align:center;margin-bottom:20px;padding:0 2px">
+        ${activePipeKpiFilter
+          ?`<span style="font-size:.82rem;font-weight:700;color:var(--purple)">🔍 Filtered by status — click KPI again to clear</span>`
+          :`<span style="font-size:.68rem;color:var(--muted);font-style:italic">💡 Click a KPI card to filter the tables below</span>`}
       </div>
     </div>
     <div class="charts-2" style="margin-bottom:14px">
@@ -2683,50 +2678,64 @@ function renderPTTracker(fd){
     : allPtAccts;
   const ptFilteredTotal = ptAccts.length;
 
-  // CSM FU breakdown
-  const csmFU={};
+  // CSM breakdown — adapts to active filter
+  const isFilteredView = !!ptKpiFilter;
+  const showFollowUp = !ptKpiFilter || ptKpiFilter==='followup';
+  const csmBD={};
   ptAccts.forEach(a=>{
-    if(!csmFU[a.csm]) csmFU[a.csm]={fu:0,total:0,stranded:0};
-    csmFU[a.csm].total++;
-    if(a.pct<50){csmFU[a.csm].fu++;csmFU[a.csm].stranded+=Math.max(0,Math.round(a.total_lic-a.ws_lic));}
+    if(!csmBD[a.csm]) csmBD[a.csm]={count:0,total:0,lic:0,wsLic:0,stranded:0};
+    const m=csmBD[a.csm];
+    m.count++; m.total++; m.lic+=a.total_lic; m.wsLic+=a.ws_lic;
+    m.stranded+=Math.max(0,Math.round(a.total_lic-a.ws_lic));
   });
-  const csmFURows = Object.entries(csmFU).filter(([,d])=>d.fu>0)
-    .sort((a,b)=>b[1].fu-a[1].fu)
+  const csmBDRows = Object.entries(csmBD).filter(([,d])=>d.count>0)
+    .sort((a,b)=>b[1].count-a[1].count)
     .map(([csm,d])=>{
-      const fp=Math.round(d.fu/d.total*100);
-      const col=fp>60?'var(--red)':fp>30?'var(--orange)':'var(--green)';
+      const avgPct=d.lic>0?Math.round(d.wsLic/d.lic*100):0;
+      const col=showFollowUp?(avgPct<20?'var(--red)':avgPct<50?'var(--orange)':'var(--green)')
+        :(avgPct>=80?'var(--green)':avgPct>=50?'var(--orange)':'var(--red)');
       return `<tr>
         <td style="color:var(--text);font-weight:600;font-size:.75rem;padding:4px 6px 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${csm}</td>
-        <td style="text-align:center;padding:4px 6px"><span style="background:rgba(229,62,62,0.12);color:var(--red);font-weight:700;font-size:.72rem;padding:1px 6px;border-radius:10px">${d.fu}</span></td>
-        <td style="text-align:center;color:var(--muted);font-size:.72rem;padding:4px 6px">${d.total}</td>
+        <td style="text-align:center;padding:4px 6px"><span style="background:${showFollowUp?'rgba(229,62,62,0.12)':'rgba(0,194,203,0.12)'};color:${showFollowUp?'var(--red)':'var(--accent)'};font-weight:700;font-size:.72rem;padding:1px 6px;border-radius:10px">${d.count}</span></td>
+        <td style="text-align:right;font-size:.72rem;color:var(--text);padding:4px 6px">${Math.round(d.lic).toLocaleString()}</td>
         <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:4px">
-          <div style="background:var(--border);border-radius:3px;height:5px;width:38px;flex-shrink:0"><div style="background:${col};width:${fp}%;height:5px;border-radius:3px"></div></div>
-          <span style="color:${col};font-size:.71rem;font-weight:600">${fp}%</span></div></td>
-        <td style="text-align:right;color:var(--muted);font-size:.72rem;padding:4px 0 4px 4px">${d.stranded}</td></tr>`;
+          <div style="background:var(--border);border-radius:3px;height:5px;width:38px;flex-shrink:0"><div style="background:${col};width:${Math.min(100,avgPct)}%;height:5px;border-radius:3px"></div></div>
+          <span style="color:${col};font-size:.71rem;font-weight:600">${avgPct}%</span></div></td>
+        <td style="text-align:right;color:var(--muted);font-size:.72rem;padding:4px 0 4px 4px">${d.stranded.toLocaleString()}</td></tr>`;
     }).join('');
+  const csmTableTitle = ptKpiFilter==='followup'?'CSM Follow-Up Leaderboard <span style="color:var(--muted);font-weight:400;font-size:.65rem">(accounts &lt;50% adoption)</span>'
+    : ptKpiFilter==='progressing'?'CSM Breakdown — Progressing <span style="color:var(--muted);font-weight:400;font-size:.65rem">(accounts 50–80% adoption)</span>'
+    : ptKpiFilter==='adopted'?'CSM Breakdown — Well Adopted <span style="color:var(--muted);font-weight:400;font-size:.65rem">(accounts &gt;80% adoption)</span>'
+    : 'CSM Follow-Up Leaderboard <span style="color:var(--muted);font-weight:400;font-size:.65rem">(accounts &lt;50% adoption)</span>';
 
-  // Tier FU breakdown
+  // Tier breakdown — adapts to active filter
   const TIER_ORDER=['T1','T2','T3','T4'];
-  const tierFU={};
+  const tierBD={};
   ptAccts.forEach(a=>{
     const t=a.tier||'T4';
-    if(!tierFU[t]) tierFU[t]={fu:0,total:0,stranded:0};
-    tierFU[t].total++;
-    if(a.pct<50){tierFU[t].fu++;tierFU[t].stranded+=Math.max(0,Math.round(a.total_lic-a.ws_lic));}
+    if(!tierBD[t]) tierBD[t]={count:0,total:0,lic:0,wsLic:0,stranded:0};
+    const m=tierBD[t];
+    m.count++; m.total++; m.lic+=a.total_lic; m.wsLic+=a.ws_lic;
+    m.stranded+=Math.max(0,Math.round(a.total_lic-a.ws_lic));
   });
-  const tierFURows = TIER_ORDER.filter(t=>tierFU[t]&&tierFU[t].total>0).map(t=>{
-    const d=tierFU[t];
-    const fp=Math.round(d.fu/d.total*100);
-    const col=fp>60?'var(--red)':fp>30?'var(--orange)':'var(--green)';
+  const tierBDRows = TIER_ORDER.filter(t=>tierBD[t]&&tierBD[t].total>0).map(t=>{
+    const d=tierBD[t];
+    const avgPct=d.lic>0?Math.round(d.wsLic/d.lic*100):0;
+    const col=showFollowUp?(avgPct<20?'var(--red)':avgPct<50?'var(--orange)':'var(--green)')
+      :(avgPct>=80?'var(--green)':avgPct>=50?'var(--orange)':'var(--red)');
     const tc=TIER_COLORS[t];
     return `<tr>
       <td style="padding:4px 6px 4px 0"><span style="background:${tc}22;color:${tc};font-size:.67rem;font-weight:700;padding:2px 8px;border-radius:12px">${TIER_LABEL[t]}</span></td>
-      <td style="text-align:center;padding:4px 6px"><span style="color:var(--red);font-weight:700">${d.fu}</span> <span style="color:var(--muted);font-size:.71rem">/ ${d.total}</span></td>
+      <td style="text-align:center;padding:4px 6px"><span style="color:${showFollowUp?'var(--red)':'var(--accent)'};font-weight:700">${d.count}</span> <span style="color:var(--muted);font-size:.71rem">/ ${d.total}</span></td>
       <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:4px">
-        <div style="background:var(--border);border-radius:3px;height:5px;width:38px;flex-shrink:0"><div style="background:${col};width:${fp}%;height:5px;border-radius:3px"></div></div>
-        <span style="color:${col};font-size:.71rem;font-weight:600">${fp}%</span></div></td>
-      <td style="text-align:right;color:var(--muted);font-size:.72rem;padding:4px 0 4px 4px">${d.stranded}</td></tr>`;
+        <div style="background:var(--border);border-radius:3px;height:5px;width:38px;flex-shrink:0"><div style="background:${col};width:${Math.min(100,avgPct)}%;height:5px;border-radius:3px"></div></div>
+        <span style="color:${col};font-size:.71rem;font-weight:600">${avgPct}%</span></div></td>
+      <td style="text-align:right;color:var(--muted);font-size:.72rem;padding:4px 0 4px 4px">${d.stranded.toLocaleString()}</td></tr>`;
   }).join('');
+  const tierTableTitle = ptKpiFilter==='followup'?'Tier Follow-Up Priority <span style="color:var(--muted);font-weight:400;font-size:.65rem">(post-training · &lt;50% adoption)</span>'
+    : ptKpiFilter==='progressing'?'Tier Breakdown — Progressing <span style="color:var(--muted);font-weight:400;font-size:.65rem">(50–80% adoption)</span>'
+    : ptKpiFilter==='adopted'?'Tier Breakdown — Well Adopted <span style="color:var(--muted);font-weight:400;font-size:.65rem">(&gt;80% adoption)</span>'
+    : 'Tier Follow-Up Priority <span style="color:var(--muted);font-weight:400;font-size:.65rem">(post-training · &lt;50% adoption)</span>';
 
   // Account-level rows
   const ptRows = ptAccts.map(a=>{
@@ -2780,41 +2789,43 @@ function renderPTTracker(fd){
       </div>
     </div>
     <div style="text-align:center;margin-bottom:18px">
-      <span style="font-size:.68rem;color:var(--muted);font-style:italic">${ptKpiFilter?'🔍 Filtered by adoption band — click KPI again to clear':'💡 Click a KPI card to filter the tables below'}</span>
+      ${ptKpiFilter
+        ?`<span style="font-size:.82rem;font-weight:700;color:var(--purple)">🔍 Filtered by adoption band — click KPI again to clear</span>`
+        :`<span style="font-size:.68rem;color:var(--muted);font-style:italic">💡 Click a KPI card to filter the tables below</span>`}
     </div>
     <!-- Customer Success Manager + Tier Follow-Up -->
     <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:18px">
       <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
         <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--accent);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">
-          Customer Success Manager Follow-Up Leaderboard <span style="color:var(--muted);font-weight:400;font-size:.65rem">(accounts &lt;50% adoption)</span></div>
+          ${csmTableTitle}</div>
         <table style="width:100%;font-size:.76rem;border-collapse:collapse;table-layout:fixed">
           <colgroup>
             <col style="width:30%"><col style="width:14%"><col style="width:16%"><col style="width:26%"><col style="width:14%">
           </colgroup>
           <thead><tr style="color:var(--muted);font-size:.65rem;text-transform:uppercase">
             <th style="text-align:left;padding:5px 6px 5px 0;font-weight:600">CSM</th>
-            <th style="text-align:center;padding:5px 6px;font-weight:600">Follow-Up</th>
-            <th style="text-align:center;padding:5px 6px;font-weight:600">Total PT</th>
-            <th style="text-align:left;padding:5px 6px;font-weight:600">% at Risk</th>
-            <th style="text-align:right;padding:5px 0 5px 4px;font-weight:600">Stranded Licenses</th>
+            <th style="text-align:center;padding:5px 6px;font-weight:600">Accounts</th>
+            <th style="text-align:right;padding:5px 6px;font-weight:600">Licenses</th>
+            <th style="text-align:left;padding:5px 6px;font-weight:600">Avg Adoption</th>
+            <th style="text-align:right;padding:5px 0 5px 4px;font-weight:600">Stranded</th>
           </tr></thead>
-          <tbody>${csmFURows}</tbody>
+          <tbody>${csmBDRows}</tbody>
         </table>
       </div>
       <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
         <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--purple);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">
-          Tier Follow-Up Priority <span style="color:var(--muted);font-weight:400;font-size:.65rem">(post-training · &lt;50% adoption)</span></div>
+          ${tierTableTitle}</div>
         <table style="width:100%;font-size:.76rem;border-collapse:collapse;table-layout:fixed">
           <colgroup>
             <col style="width:20%"><col style="width:26%"><col style="width:32%"><col style="width:22%">
           </colgroup>
           <thead><tr style="color:var(--muted);font-size:.65rem;text-transform:uppercase">
             <th style="text-align:left;padding:5px 6px 5px 0;font-weight:600">Tier</th>
-            <th style="text-align:center;padding:5px 6px;font-weight:600">Follow-Up / Total</th>
-            <th style="text-align:left;padding:5px 6px;font-weight:600">% at Risk</th>
-            <th style="text-align:right;padding:5px 0 5px 4px;font-weight:600">Stranded Licenses</th>
+            <th style="text-align:center;padding:5px 6px;font-weight:600">Accounts / Total</th>
+            <th style="text-align:left;padding:5px 6px;font-weight:600">Avg Adoption</th>
+            <th style="text-align:right;padding:5px 0 5px 4px;font-weight:600">Stranded</th>
           </tr></thead>
-          <tbody>${tierFURows}</tbody>
+          <tbody>${tierBDRows}</tbody>
         </table>
       </div>
     </div>
