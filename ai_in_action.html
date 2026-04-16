@@ -352,6 +352,7 @@
     <div class="pl-tab-bar">
       <button class="pl-btn pl-active" onclick="switchPLView('posttraining',this)">🎓 Post-Training</button>
       <button class="pl-btn" onclick="switchPLView('activepipe',this)">⚡ Active Pipeline</button>
+      <button class="pl-btn" onclick="switchPLView('needsscheduling',this)">🔴 Needs Scheduling</button>
       <button class="pl-btn" onclick="switchPLView('untouched',this)">🔍 Untouched Accounts</button>
     </div>
     <!-- Sub-view: Post-Training -->
@@ -361,13 +362,17 @@
         <div id="exec-posttrain-table"></div>
       </div>
     </div>
-    <!-- Sub-view: Untouched Accounts -->
-    <div id="pl-untouched" style="display:none;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:12px">
-      <div id="pl-untouched-content"></div>
-    </div>
     <!-- Sub-view: Active Pipeline -->
     <div id="pl-activepipe" style="display:none;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:12px">
       <div id="pl-activepipe-content"></div>
+    </div>
+    <!-- Sub-view: Needs Scheduling (no_meeting + not_pri) -->
+    <div id="pl-needsscheduling" style="display:none;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:12px">
+      <div id="pl-needsscheduling-content"></div>
+    </div>
+    <!-- Sub-view: Untouched Accounts -->
+    <div id="pl-untouched" style="display:none;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:12px">
+      <div id="pl-untouched-content"></div>
     </div>
   </div>
 
@@ -1769,7 +1774,7 @@ function renderKPIs(fd){
   const inProg    = fd.filter(d=>d.wp_cat==='in_prog').length;
   const mtg       = fd.filter(d=>d.wp_cat==='meeting').length;
   const noMtg     = fd.filter(d=>d.wp_cat==='no_meeting').length;
-  const notPrior  = fd.filter(d=>d.wp_cat==='not_prior').length;
+  const notPrior  = fd.filter(d=>d.wp_cat==='not_pri').length;
   const notInWP   = fd.length - actioned;
   const pipeline  = inProg + mtg;
   const immediate = noMtg + notPrior;
@@ -1818,7 +1823,7 @@ function switchSubView(view, btn){
 }
 function switchPLView(view, btn){
   activePLView = view;
-  ['posttraining','untouched','activepipe'].forEach(v=>{
+  ['posttraining','untouched','activepipe','needsscheduling'].forEach(v=>{
     const d=document.getElementById('pl-'+v);
     if(d){ d.style.display='none'; }
   });
@@ -2227,8 +2232,8 @@ function renderCSMTable(fd){
 
 // ── WP Status Table ───────────────────────────────────────────────────────────
 function renderWPTable(fd){
-  const cats=['post_train','in_prog','meeting','no_meeting','not_prior'];
-  const base={post_train:0,in_prog:0,meeting:0,no_meeting:0,not_prior:0};
+  const cats=['post_train','in_prog','meeting','no_meeting','not_pri'];
+  const base={post_train:0,in_prog:0,meeting:0,no_meeting:0,not_pri:0};
   const map={};
   fd.forEach(d=>{
     if(EXCL.has(d.csm)) return;
@@ -2247,7 +2252,7 @@ function renderWPTable(fd){
   const totTotal=rows.reduce((s,r)=>s+r.total,0);
   const totNT=totTotal-totActioned;
 
-  const clr={post_train:'text-g',in_prog:'text-a',meeting:'text-m',no_meeting:'text-r',not_prior:'text-m'};
+  const clr={post_train:'text-g',in_prog:'text-a',meeting:'text-m',no_meeting:'text-r',not_pri:'text-m'};
 
   el('wp-tbody').innerHTML=rows.map(r=>{
     const nt=r.total-r.actioned;
@@ -2257,7 +2262,7 @@ function renderWPTable(fd){
       <td class="mono ${clr.in_prog}">${r.in_prog||0}</td>
       <td class="mono ${clr.meeting}">${r.meeting||0}</td>
       <td class="mono ${clr.no_meeting}">${r.no_meeting||0}</td>
-      <td class="mono">${r.not_prior||0}</td>
+      <td class="mono">${r.not_pri||0}</td>
       <td class="mono text-r">${nt}</td>
     </tr>`;
   }).join('')+`
@@ -2267,7 +2272,7 @@ function renderWPTable(fd){
       <td class="mono text-a">${totals.in_prog}</td>
       <td class="mono">${totals.meeting}</td>
       <td class="mono text-r">${totals.no_meeting}</td>
-      <td class="mono">${totals.not_prior}</td>
+      <td class="mono">${totals.not_pri}</td>
       <td class="mono text-r">${totNT}</td>
     </tr>`;
 }
@@ -2280,7 +2285,7 @@ function renderCoverage(fd){
     {lbl:'🔄 In Progress',         cat:'in_prog',    clr:'var(--accent)'},
     {lbl:'📅 Meeting Set',         cat:'meeting',    clr:'var(--muted)'},
     {lbl:'⚠️ No Meeting Set',      cat:'no_meeting', clr:'var(--red)'},
-    {lbl:'📋 Not Prioritized',     cat:'not_prior',  clr:'var(--orange)'},
+    {lbl:'📋 Not Prioritized',     cat:'not_pri',  clr:'var(--orange)'},
     {lbl:'❓ Not in WP Tracker',   cat:'',           clr:'#E8DCF5'},
   ];
   const rows=items.map(({lbl,cat,clr})=>{
@@ -2562,6 +2567,151 @@ function renderActivePipeline(fd){
     </div>`;
 }
 
+// ── Needs Scheduling (no_meeting + not_pri) ─────────────────────────────────
+function renderNeedsScheduling(fd){
+  const box=document.getElementById('pl-needsscheduling-content');
+  if(!box) return;
+
+  const accts=fd.filter(d=>(d.wp_cat==='no_meeting'||d.wp_cat==='not_pri')&&!EXCL.has(d.csm))
+    .map(d=>{
+      const sd=SEARCH_DATA[d.account]||{s:0,sl:0};
+      return {...d, wsPct:d.ws_adopt_pct*100, srchPct:sd.s*100, srchLic:sd.sl};
+    })
+    .sort((a,b)=>b.total_lic-a.total_lic);
+
+  const total=accts.length;
+  const noMtg=accts.filter(a=>a.wp_cat==='no_meeting').length;
+  const notPri=accts.filter(a=>a.wp_cat==='not_pri').length;
+  const totalLic=accts.reduce((s,a)=>s+a.total_lic,0);
+  const wsActive=accts.filter(a=>a.wsPct>0).length;
+  const avgWS=totalLic>0?accts.reduce((s,a)=>s+a.ws_lic,0)/totalLic*100:0;
+
+  const csmMap={};
+  accts.forEach(a=>{
+    if(!csmMap[a.csm]) csmMap[a.csm]={noMtg:0,notPri:0,lic:0,wsLic:0};
+    if(a.wp_cat==='no_meeting') csmMap[a.csm].noMtg++; else csmMap[a.csm].notPri++;
+    csmMap[a.csm].lic+=a.total_lic; csmMap[a.csm].wsLic+=a.ws_lic;
+  });
+  const csmRows=Object.entries(csmMap).sort((a,b)=>(b[1].noMtg+b[1].notPri)-(a[1].noMtg+a[1].notPri))
+    .map(([csm,d])=>{
+      const ap=d.lic>0?Math.round(d.wsLic/d.lic*100):0;
+      return `<tr>
+        <td style="font-size:.73rem;font-weight:600;color:var(--text)">${csm}</td>
+        <td style="text-align:center"><span style="background:rgba(255,77,79,.12);color:var(--red);font-weight:700;font-size:.72rem;padding:2px 8px;border-radius:10px">${d.noMtg}</span></td>
+        <td style="text-align:center"><span style="background:rgba(138,122,155,.12);color:var(--muted);font-weight:700;font-size:.72rem;padding:2px 8px;border-radius:10px">${d.notPri}</span></td>
+        <td style="text-align:right;font-size:.72rem;color:var(--text)">${Math.round(d.lic).toLocaleString()}</td>
+        <td style="text-align:center">
+          <div style="display:flex;align-items:center;gap:5px;justify-content:center">
+            <div style="background:var(--border);border-radius:3px;height:5px;width:44px;flex-shrink:0">
+              <div style="background:var(--accent);width:${Math.min(100,ap)}%;height:5px;border-radius:3px"></div></div>
+            <span style="font-size:.72rem;color:var(--accent);font-weight:700">${ap}%</span></div></td>
+      </tr>`;
+    }).join('');
+
+  const rows=accts.map(a=>{
+    const statusLabel=a.wp_cat==='no_meeting'
+      ?`<span style="background:rgba(255,77,79,.12);color:var(--red);font-weight:700;font-size:.7rem;padding:2px 8px;border-radius:10px;white-space:nowrap">🔴 No Meeting Set</span>`
+      :`<span style="background:rgba(138,122,155,.12);color:var(--muted);font-weight:700;font-size:.7rem;padding:2px 8px;border-radius:10px;white-space:nowrap">⬛ Not Prioritized</span>`;
+    const wsBar=`<div style="display:flex;align-items:center;gap:5px">
+      <div style="background:var(--border);border-radius:3px;height:5px;width:44px;flex-shrink:0">
+        <div style="background:${a.wsPct>=50?'var(--green)':a.wsPct>0?'var(--orange)':'var(--border)'};width:${Math.min(100,a.wsPct)}%;height:5px;border-radius:3px"></div></div>
+      <span style="font-size:.72rem;color:${a.wsPct>=50?'var(--green)':a.wsPct>0?'var(--orange)':'var(--muted)'};font-weight:${a.wsPct>0?'700':'400'}">${a.wsPct>0?a.wsPct.toFixed(0)+'%':'—'}</span></div>`;
+    const srchBar=a.srchPct>0
+      ?`<div style="display:flex;align-items:center;gap:5px">
+          <div style="background:var(--border);border-radius:3px;height:5px;width:44px;flex-shrink:0">
+            <div style="background:#FFA000;width:${Math.min(100,a.srchPct)}%;height:5px;border-radius:3px"></div></div>
+          <span style="color:#FFA000;font-weight:700;font-size:.72rem">${a.srchPct.toFixed(0)}%</span></div>`
+      :`<span style="color:var(--muted);font-size:.72rem">—</span>`;
+    const tierC=TIER_COLORS[a.tier]||'var(--muted)';
+    return `<tr>
+      <td style="font-size:.73rem;color:var(--text);font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.account}</td>
+      <td style="font-size:.72rem;color:var(--text-mid);white-space:nowrap">${a.csm}</td>
+      <td style="text-align:center"><span style="background:${tierC}22;color:${tierC};font-size:.67rem;font-weight:700;padding:2px 8px;border-radius:12px">${TIER_LABEL[a.tier]||a.tier}</span></td>
+      <td style="text-align:right;font-size:.73rem;color:var(--text)">${Math.round(a.total_lic)}</td>
+      <td style="text-align:right;font-size:.72rem;color:var(--muted)">${a.arr>0?'$'+Math.round(a.arr/1000)+'K':'—'}</td>
+      <td style="text-align:center">${statusLabel}</td>
+      <td style="text-align:center">${srchBar}</td>
+      <td style="text-align:center">${wsBar}</td>
+    </tr>`;
+  }).join('');
+
+  box.innerHTML=`
+    <div class="panel accent-top" style="margin-bottom:14px">
+      <div class="panel-title" style="margin-bottom:12px">🔴 Needs Scheduling — Priority Accounts Without a Meeting</div>
+      <div style="font-size:.77rem;color:var(--muted);margin-bottom:14px">These accounts are flagged as <strong style="color:var(--red)">Priority</strong> or have a status that requires a meeting to be set. They need CSM outreach to schedule a Workspaces session.</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+        <div class="pt-kpi" style="border-left:4px solid var(--red)">
+          <div class="pt-kpi-lbl">No Meeting Set</div>
+          <div class="pt-kpi-val" style="color:var(--red)">${noMtg}</div>
+          <div class="pt-kpi-sub">Priority accounts awaiting scheduling</div>
+        </div>
+        <div class="pt-kpi" style="border-left:4px solid var(--muted)">
+          <div class="pt-kpi-lbl">Not Prioritized</div>
+          <div class="pt-kpi-val" style="color:var(--muted)">${notPri}</div>
+          <div class="pt-kpi-sub">Deprioritized — review for re-engagement</div>
+        </div>
+        <div class="pt-kpi" style="border-left:4px solid var(--purple)">
+          <div class="pt-kpi-lbl">Total Licenses</div>
+          <div class="pt-kpi-val" style="color:var(--purple)">${Math.round(totalLic).toLocaleString()}</div>
+          <div class="pt-kpi-sub">Avg WS adoption: ${avgWS.toFixed(1)}%</div>
+        </div>
+        <div class="pt-kpi" style="border-left:4px solid var(--accent)">
+          <div class="pt-kpi-lbl">Already Using WS</div>
+          <div class="pt-kpi-val" style="color:var(--accent)">${wsActive}</div>
+          <div class="pt-kpi-sub">Self-adopted without session</div>
+        </div>
+      </div>
+    </div>
+    <div class="charts-2" style="margin-bottom:14px">
+      <div class="panel" style="padding:14px 16px">
+        <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:10px">CSM Breakdown</div>
+        <table class="data-table">
+          <thead><tr>
+            <th>CSM</th>
+            <th style="text-align:center">No Meeting</th>
+            <th style="text-align:center">Not Prioritized</th>
+            <th style="text-align:right">Licenses</th>
+            <th style="text-align:center">Current WS %</th>
+          </tr></thead>
+          <tbody>${csmRows}</tbody>
+        </table>
+      </div>
+      <div class="panel" style="padding:14px 16px">
+        <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:10px">Tier Distribution</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${['T1','T2','T3','T4'].map(t=>{
+            const cnt=accts.filter(a=>a.tier===t).length;
+            if(!cnt) return '';
+            const tc=TIER_COLORS[t];
+            const pct=Math.round(cnt/total*100);
+            return `<div style="display:flex;align-items:center;gap:10px">
+              <span style="background:${tc}22;color:${tc};font-size:.68rem;font-weight:700;padding:2px 10px;border-radius:10px;min-width:56px;text-align:center">${TIER_LABEL[t]}</span>
+              <div style="flex:1;background:var(--border);border-radius:4px;height:8px">
+                <div style="background:${tc};width:${pct}%;height:8px;border-radius:4px"></div></div>
+              <span style="font-size:.72rem;color:var(--text);font-weight:700;min-width:28px">${cnt}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="padding:14px 16px">
+      <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:10px">Account-Level Detail <span style="font-weight:400;color:var(--muted);font-size:.72rem">(${total} accounts · sorted by license count)</span></div>
+      <div class="table-wrap">
+        <table class="data-table" style="min-width:800px">
+          <thead><tr>
+            <th>Account</th><th>CSM</th><th>Tier</th>
+            <th style="text-align:right">Licenses</th>
+            <th style="text-align:right">ARR</th>
+            <th style="text-align:center">Status</th>
+            <th style="text-align:center">Search Adoption</th>
+            <th style="text-align:center">WS Adoption</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
 // ── Post-Training Tracker ────────────────────────────────────────────────────
 function renderPTTracker(fd){
   const ptAccts = fd.filter(d=>d.wp_cat==='post_train')
@@ -2829,7 +2979,7 @@ function renderSpotlight(fd){
     in_prog:    {icon:'🔄', label:'In Progress',     color:'#00C2CB'},
     meeting:    {icon:'📅', label:'Meeting Set',     color:'#7B5EA7'},
     no_meeting: {icon:'🔴', label:'No Meeting Set',  color:'#FF4D4F'},
-    not_prior:  {icon:'⬛', label:'Not Prioritized', color:'#8A7A9B'},
+    not_pri:  {icon:'⬛', label:'Not Prioritized', color:'#8A7A9B'},
   };
   const wpBadge = (cat) => {
     const w = WP_LABEL[cat];
@@ -2939,6 +3089,7 @@ function render(){
   renderPTTracker(fd);
   renderUntouchedAccounts(fd);
   renderActivePipeline(fd);
+  renderNeedsScheduling(fd);
   renderSpotlight(fd);
 }
 
