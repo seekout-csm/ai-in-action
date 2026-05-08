@@ -2655,11 +2655,13 @@ function renderUntouchedAccounts(fd){
   const srchOnlyLic=allAccts.filter(a=>a.seg==='search').reduce((s,a)=>s+a.total_lic,0);
   const filteredTotal=accts.length;
 
-  // Per-segment license breakdowns
-  const licBySeg={}, wsBySeg={};
+  // Per-segment license breakdowns: total + feature-specific (search licenses for Search-Only, ws licenses for WS)
+  const licBySeg={}, srchLicBySeg={}, wsLicBySeg={};
   ['search','none','ws'].forEach(seg=>{
     const segAccts=allAccts.filter(a=>a.seg===seg);
     licBySeg[seg]=segAccts.reduce((s,a)=>s+a.total_lic,0);
+    srchLicBySeg[seg]=segAccts.reduce((s,a)=>s+(a.srchLic||0),0);
+    wsLicBySeg[seg]=segAccts.reduce((s,a)=>s+(a.ws_lic||0),0);
   });
 
   const csmSrch={};
@@ -2703,17 +2705,17 @@ function renderUntouchedAccounts(fd){
         <div class="pt-kpi${untouchedKpiFilter==='search'?' kpi-active':''}" style="border-left:4px solid #FFA000" onclick="toggleUntouchedKpi('search')">
           <div class="pt-kpi-lbl">🔍 Search-Only (High Priority)</div>
           <div class="pt-kpi-val" style="color:#FFA000">${srchOnly}</div>
-          <div class="pt-kpi-sub">${Math.round(licBySeg.search).toLocaleString()} licenses · using SeekOut Search</div>
+          <div class="pt-kpi-sub"><strong style="color:#FFA000">${Math.round(srchLicBySeg.search).toLocaleString()}</strong> search licenses of <strong>${Math.round(licBySeg.search).toLocaleString()}</strong> total</div>
         </div>
         <div class="pt-kpi${untouchedKpiFilter==='none'?' kpi-active':''}" style="border-left:4px solid var(--muted)" onclick="toggleUntouchedKpi('none')">
           <div class="pt-kpi-lbl">No Feature Activity</div>
           <div class="pt-kpi-val" style="color:var(--muted)">${noneActive}</div>
-          <div class="pt-kpi-sub">${Math.round(licBySeg.none).toLocaleString()} licenses · No Search, Rediscovery or WS</div>
+          <div class="pt-kpi-sub"><strong style="color:var(--text)">${Math.round(licBySeg.none).toLocaleString()}</strong> total licenses · 0 active on Search/Rediscovery/WS</div>
         </div>
         <div class="pt-kpi${untouchedKpiFilter==='ws'?' kpi-active':''}" style="border-left:4px solid var(--accent)" onclick="toggleUntouchedKpi('ws')">
           <div class="pt-kpi-lbl">Already Using Workspaces</div>
           <div class="pt-kpi-val" style="color:var(--accent)">${wsActive}</div>
-          <div class="pt-kpi-sub">${Math.round(licBySeg.ws).toLocaleString()} licenses · Self-adopted</div>
+          <div class="pt-kpi-sub"><strong style="color:var(--accent)">${Math.round(wsLicBySeg.ws).toLocaleString()}</strong> WS licenses of <strong>${Math.round(licBySeg.ws).toLocaleString()}</strong> total</div>
         </div>
       </div>
       <div style="text-align:center;margin-bottom:14px;padding:0 2px">
