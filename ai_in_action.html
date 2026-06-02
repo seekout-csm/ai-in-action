@@ -954,22 +954,22 @@ const RAW = [
 ];
 
 const CSM_ADOPTION = {
-  "Srinidhi Shridhara":{"baseline": 0.3727363636363636, "current": 0.3749772727272727, "target": 0.3927363636363636, "above_below": "Down", "variance": -0.01775909090909089, "lic_to_target": null},
+  "Srinidhi Shridhara":{"baseline": 0.3727363636363636, "current": 0.3749772727272727, "target": 0.3927363636363636, "above_below": "Down", "variance": -0.01775909090909089, "lic_to_target": 3.1256},
   "Ajay Babu":{"baseline": 0.2514705882352941, "current": 0.3505747126436782, "target": 0.27147058823529413, "above_below": "Up", "variance": 0.07910412440838405, "lic_to_target": null},
-  "Srikanth Hemmige":{"baseline": 0.3478913043478261, "current": 0.3390508474576272, "target": 0.36789130434782613, "above_below": "Down", "variance": -0.02884045689019893, "lic_to_target": null},
+  "Srikanth Hemmige":{"baseline": 0.3478913043478261, "current": 0.3390508474576272, "target": 0.36789130434782613, "above_below": "Down", "variance": -0.02884045689019893, "lic_to_target": 1.7016},
   "Joanne Villaruz":{"baseline": 0.1989642857142857, "current": 0.2947789473684211, "target": 0.2189642857142857, "above_below": "Up", "variance": 0.07581466165413539, "lic_to_target": null},
-  "Shivani Chawak":{"baseline": 0.3061377551020409, "current": 0.2864479166666667, "target": 0.3261377551020409, "above_below": "Down", "variance": -0.039689838435374214, "lic_to_target": null},
+  "Shivani Chawak":{"baseline": 0.3061377551020409, "current": 0.2864479166666667, "target": 0.3261377551020409, "above_below": "Down", "variance": -0.039689838435374214, "lic_to_target": 7.7395},
   "Nivedita Bhardwaj":{"baseline": 0.23366834170854267, "current": 0.28494300518134713, "target": 0.2536683417085427, "above_below": "Up", "variance": 0.03127466347280444, "lic_to_target": null},
-  "Aaron Cuellar":{"baseline": 0.25539754098360656, "current": 0.27045901639344266, "target": 0.2753975409836066, "above_below": "Down", "variance": -0.004938524590163917, "lic_to_target": null},
-  "Rithwik Jyotiraditya":{"baseline": 0.26135227272727274, "current": 0.24792561983471076, "target": 0.28135227272727276, "above_below": "Down", "variance": -0.033426652892562, "lic_to_target": null},
-  "Cherrie Rhodes":{"baseline": 0.22709478260869564, "current": 0.23818586387434554, "target": 0.24709478260869563, "above_below": "Down", "variance": -0.008908918734350096, "lic_to_target": null},
+  "Aaron Cuellar":{"baseline": 0.25539754098360656, "current": 0.27045901639344266, "target": 0.2753975409836066, "above_below": "Down", "variance": -0.004938524590163917, "lic_to_target": 3.0174},
+  "Rithwik Jyotiraditya":{"baseline": 0.26135227272727274, "current": 0.24792561983471076, "target": 0.28135227272727276, "above_below": "Down", "variance": -0.033426652892562, "lic_to_target": 4.0781},
+  "Cherrie Rhodes":{"baseline": 0.22709478260869564, "current": 0.23818586387434554, "target": 0.24709478260869563, "above_below": "Down", "variance": -0.008908918734350096, "lic_to_target": 3.519},
   "Yu Sueda":{"baseline": 0.08833613445378152, "current": 0.1822707182320442, "target": 0.10833613445378153, "above_below": "Up", "variance": 0.07393458377826266, "lic_to_target": null},
-  "Andy Masten":{"baseline": 0.14471098265895954, "current": 0.13837074148296596, "target": 0.16471098265895953, "above_below": "Down", "variance": -0.026340241175993567, "lic_to_target": null},
+  "Andy Masten":{"baseline": 0.14471098265895954, "current": 0.13837074148296596, "target": 0.16471098265895953, "above_below": "Down", "variance": -0.026340241175993567, "lic_to_target": 13.1438},
   "Sara Badalucco":{"baseline": 0.1892890855457227, "current": 0.3118762376237622, "target": null, "above_below": null, "variance": null, "lic_to_target": null},
   "Mike Deeb":{"baseline": 0.15701008303677338, "current": 0.21411782296650714, "target": null, "above_below": null, "variance": null, "lic_to_target": null}
 };
 
-const METRICS_TOTAL = {"baseline": 0.23257260504201693, "current": 0.2509321401938852, "target": 0.25257260504201695, "above_below": "Down", "variance": -0.0016404648481317397, "lic_to_target": null};
+const METRICS_TOTAL = {"baseline": 0.23257260504201693, "current": 0.2509321401938852, "target": 0.25257260504201695, "above_below": "Down", "variance": -0.0016404648481317397, "lic_to_target": 4.4375};
 const SEARCH_DATA = {
   "11th Hour Service":{"s": 0, "sl": 0},
   "123Dentist":{"s": 0.143, "sl": 1.001},
@@ -2505,8 +2505,8 @@ function renderCoverage(fd){
   ];
   const rows=items.map(({lbl,cat,clr})=>{
     const cnt=cat===''?fd.filter(d=>d.wp_cat==='').length:fd.filter(d=>d.wp_cat===cat).length;
-    const p=(cnt/n*100).toFixed(1);
-    const barW=Math.round(cnt/n*100);
+    const p=n>0?(cnt/n*100).toFixed(1):'0.0';
+    const barW=n>0?Math.round(cnt/n*100):0;
     return `<div class="cov-row">
       <div class="cov-lbl">${lbl}</div>
       <div class="cov-num">${cnt}</div>
@@ -2531,8 +2531,8 @@ function renderCoverage(fd){
     <tbody>
     ${items.map(({lbl,cat,clr})=>{
       const cnt=cat===''?fd.filter(d=>d.wp_cat==='').length:fd.filter(d=>d.wp_cat===cat).length;
-      const p=(cnt/n*100).toFixed(1);
-      const barW=Math.round(cnt/n*100);
+      const p=n>0?(cnt/n*100).toFixed(1):'0.0';
+      const barW=n>0?Math.round(cnt/n*100):0;
       return `<tr style="border-bottom:1px solid var(--border);">
         <td style="padding:9px 10px;font-size:.8rem;">${lbl}</td>
         <td style="padding:9px 10px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.78rem;font-weight:600;">${cnt}</td>
